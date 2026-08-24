@@ -12,6 +12,21 @@ from cslim.main import _normalize
 runner = CliRunner()
 
 
+def test_exact_fails_loudly_instead_of_silently_estimating(tmp_path: Path) -> None:
+    """`--exact` used to fall back to the heuristic without saying so.
+
+    A budget computed from estimates while the user explicitly asked for API
+    counts is a silent lie, so an unavailable exact estimator is now an error.
+    """
+    (tmp_path / "m.py").write_text("def f() -> None:\n    pass\n", encoding="utf-8")
+    result = runner.invoke(app, ["stats", str(tmp_path), "--exact"])
+    if "exact token counting needs" in result.output:
+        assert result.exit_code == 1
+        assert "Drop --exact" in result.output
+    else:  # anthropic is installed and configured: counts must be real
+        assert result.exit_code == 0
+
+
 def test_implicit_pack_command() -> None:
     assert _normalize(["./src"]) == ["pack", "./src"]
     assert _normalize(["main.py", "-q"]) == ["pack", "main.py", "-q"]

@@ -57,6 +57,7 @@ from .core import (
     stdout_is_pipe,
 )
 from .core.theme import banner
+from .core.tokenizer import EstimatorUnavailable
 
 __version__ = "0.1.0"
 
@@ -235,6 +236,14 @@ def _files_table(bundle: Bundle, limit: int = 40) -> Table:
 
 
 def _run_with_progress(request: CompressRequest, quiet: bool) -> Bundle:
+    try:
+        return _run_uncaught(request, quiet)
+    except EstimatorUnavailable as exc:
+        _fail(f"{exc}\n  Drop --exact to use the calibrated estimator instead.")
+        raise  # unreachable: _fail exits
+
+
+def _run_uncaught(request: CompressRequest, quiet: bool) -> Bundle:
     if quiet or not console.is_terminal:
         return CompressionService().run(request)
 

@@ -388,7 +388,7 @@ default we should pick.
 
 ```bash
 uv venv && uv pip install -e '.[dev,all]'
-.venv/bin/pytest        # 66 tests
+.venv/bin/pytest        # 67 tests
 .venv/bin/mypy cslim    # strict
 .venv/bin/ruff check cslim bench
 ```

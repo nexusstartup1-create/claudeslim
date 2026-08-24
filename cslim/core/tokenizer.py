@@ -189,6 +189,13 @@ class AnthropicEstimator:
         self._client = anthropic.Anthropic(api_key=api_key) if api_key else anthropic.Anthropic()
         self._model = model
         self._fallback = HeuristicEstimator()
+        self.degraded: str = ""
+        """Non-empty once a call has fallen back; the reason why."""
+
+    @property
+    def exact_so_far(self) -> bool:
+        """False once any count came from the fallback instead of the API."""
+        return not self.degraded
 
     def count(self, text: str) -> int:
         if not text:
@@ -199,26 +206,52 @@ class AnthropicEstimator:
                 messages=[{"role": "user", "content": text}],
             )
             return int(response.input_tokens)
-        except Exception:
+        except Exception as exc:
+            # Record the downgrade instead of hiding it: a budget computed from
+            # estimates while the user asked for exact counts is a silent lie.
+            if not self.degraded:
+                self.degraded = f"{type(exc).__name__}: {exc}"
             return self._fallback.count(text)
+
+
+class EstimatorUnavailable(RuntimeError):
+    """``--exact`` was requested but the API-backed estimator cannot be built."""
 
 
 @lru_cache(maxsize=8)
 def resolve_estimator(
-    *, exact: bool = False, model: str = "claude-sonnet-5", allow_tiktoken: bool = True
+    *,
+    exact: bool = False,
+    model: str = "claude-sonnet-5",
+    allow_tiktoken: bool = True,
+    strict: bool = False,
 ) -> TokenEstimator:
-    """Pick the best estimator available, degrading silently."""
+    """Pick the best estimator available.
+
+    With ``strict=True`` an unavailable exact estimator raises
+    :class:`EstimatorUnavailable` instead of quietly degrading — because a user
+    who asked for exact counts and got estimates has been misled, not helped.
+    """
     if exact:
         try:
             return AnthropicEstimator(model=model)
-        except Exception:
-            pass
+        except Exception as exc:
+            if strict:
+                raise EstimatorUnavailable(
+                    "exact token counting needs the `anthropic` package and a "
+                    f"working ANTHROPIC_API_KEY ({type(exc).__name__}: {exc})"
+                ) from exc
     if allow_tiktoken:
         try:
             return TiktokenEstimator()
         except Exception:
             pass
     return HeuristicEstimator()
+
+
+def degraded_reason(estimator: TokenEstimator) -> str:
+    """Why an exact estimator stopped being exact mid-run, if it did."""
+    return str(getattr(estimator, "degraded", "") or "")
 
 
 # --------------------------------------------------------------------------- #

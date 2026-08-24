@@ -32,6 +32,7 @@ from .tokenizer import (
     ModelSpec,
     TokenBudget,
     TokenEstimator,
+    degraded_reason,
     fit_to_budget,
     resolve_estimator,
     resolve_model,
@@ -81,8 +82,12 @@ class CompressionService:
     def estimator_for(self, request: CompressRequest) -> TokenEstimator:
         if self._estimator is not None:
             return self._estimator
+        # strict: asking for --exact and silently getting estimates is worse
+        # than a clear error, so an explicit request fails loudly.
         return resolve_estimator(
-            exact=request.exact_tokens, model=resolve_model(request.model).id
+            exact=request.exact_tokens,
+            model=resolve_model(request.model).id,
+            strict=request.exact_tokens,
         )
 
     def _emit(self, done: int, total: int, current: str) -> None:
@@ -142,11 +147,16 @@ class CompressionService:
         elif request.max_tokens is not None:
             self._apply_budget(bundle, budget)
 
+        # An exact estimator that fell back mid-run is no longer exact; say so
+        # rather than labelling estimates as API-accurate.
+        degraded = degraded_reason(estimator)
+        if degraded:
+            bundle.warnings.append(f"exact token counting fell back to estimates — {degraded}")
         bundle.stats = sum_stats(
             bundle.files,
             model_id=model.id,
             context_window=budget.window,
-            exact=estimator.exact,
+            exact=estimator.exact and not degraded,
         )
         if request.render_payload:
             bundle.payload = render_bundle(bundle, request.render)
