@@ -221,9 +221,92 @@ a { color: var(--accent); }
 section { padding-block: var(--gap); }
 .stack { display: flex; flex-direction: column; gap: 1.4rem; }
 
-/* ---------- hero ---------- */
-.hero { padding-top: clamp(3.5rem, 8vw, 6rem); }
-.hero h1 span { color: var(--brand); }
+/* ---------- kinetic hero ---------- */
+.hero {
+  position: relative;
+  min-height: 100svh;
+  display: flex;
+  align-items: center;
+  padding-block: clamp(6rem, 14vh, 9rem) clamp(4rem, 10vh, 6rem);
+  background: #0e1014;
+  overflow: hidden;
+  isolation: isolate;
+}
+#grid {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  pointer-events: none;
+  display: block;
+}
+/* the hero is its own dark world: fixed colours, not theme tokens */
+.hero-inner { display: flex; flex-direction: column; gap: 1.4rem; }
+.hero h1 { color: #fff; }
+.hero h1 span { color: var(--orange); }
+.hero .lede { color: rgba(255, 255, 255, 0.62); }
+.hero .eyebrow { color: var(--orange-w); }
+.hero .terminal {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.1) inset, 0 12px 40px -12px rgba(0, 0, 0, 0.6);
+}
+.hero .terminal .cmd { color: rgba(255, 255, 255, 0.9); }
+.hero .copy { border-color: rgba(255, 255, 255, 0.2); color: rgba(255, 255, 255, 0.65); }
+.hero .copy:hover { color: #fff; border-color: var(--blue-sky); }
+.hero .btn-ghost {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+.hint {
+  font-family: var(--mono);
+  font-size: 0.76rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.35);
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.hint::before {
+  content: "";
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--orange);
+  animation: pulse 2.4s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 0.35; transform: scale(1); }
+  50%      { opacity: 1;    transform: scale(1.35); }
+}
+
+/* entrance stagger */
+.anim { opacity: 1; }
+.js .anim { opacity: 0; transform: translateY(14px); }
+.js.loaded .anim {
+  animation: rise 0.75s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation-delay: var(--d, 0ms);
+}
+@keyframes rise { to { opacity: 1; transform: none; } }
+
+/* header sits over the dark hero until you scroll past it */
+/* Default is the readable glass state, so a failed script leaves a usable
+   header rather than transparent nav over white. JS only opts INTO the
+   dark-hero variant. */
+header { transition: background 0.35s ease, border-color 0.35s ease; }
+header .mark, header nav a { transition: color 0.35s ease; }
+header.over-hero {
+  background: transparent;
+  border-bottom-color: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+header.over-hero .mark { color: #fff; }
+header.over-hero nav a { color: rgba(255, 255, 255, 0.72); }
+header.over-hero nav a:hover { color: #fff; }
+
 .cta { display: flex; flex-wrap: wrap; gap: 0.75rem; }
 .btn {
   display: inline-flex;
@@ -238,15 +321,8 @@ section { padding-block: var(--gap); }
   border: 1px solid transparent;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
-.btn-primary { background: var(--accent); color: #fff; }
-.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 24px -10px var(--accent); }
-.btn-ghost {
-  background: var(--glass-bg);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-color: var(--glass-border);
-  color: var(--text);
-}
+.btn-primary { background: var(--blue); color: #fff; }
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 28px -10px var(--blue); }
 .btn-ghost:hover { transform: translateY(-2px); }
 
 .terminal { padding: 0.9rem 1rem; display: flex; align-items: center; gap: 0.75rem; }
@@ -433,20 +509,22 @@ footer { border-top: 1px solid var(--rule); padding-block: 3rem; }
 
 <main id="main">
 
-  <section class="hero">
-    <div class="wrap stack">
-      <p class="eyebrow">Context optimizer for Claude Code</p>
-      <h1>Token count is <span>not cost.</span></h1>
-      <p class="lede">A context-window optimizer for Claude Code — and the benchmarks that say when not to use it.</p>
-      <div class="cta">
+  <section class="hero" id="hero">
+    <canvas id="grid" aria-hidden="true"></canvas>
+    <div class="wrap hero-inner">
+      <p class="eyebrow anim" style="--d:0ms">Context optimizer for Claude Code</p>
+      <h1 class="anim" style="--d:80ms">Token count is <span>not cost.</span></h1>
+      <p class="lede anim" style="--d:160ms">A context-window optimizer for Claude Code — and the benchmarks that say when not to use it.</p>
+      <div class="cta anim" style="--d:240ms">
         <a class="btn btn-primary" href="https://github.com/nexusstartup1-create/claudeslim">View on GitHub</a>
         <a class="btn btn-ghost" href="#benchmarks">Read the benchmarks</a>
       </div>
-      <div class="glass terminal" style="max-width:640px">
+      <div class="glass terminal anim" style="--d:320ms;max-width:640px">
         <div class="cmd" id="install-cmd">git clone https://github.com/nexusstartup1-create/claudeslim.git</div>
         <button class="copy" id="copy-btn" type="button">Copy</button>
         <span class="note" id="copy-live" aria-live="polite" style="position:absolute;left:-9999px"></span>
       </div>
+      <p class="hint anim" style="--d:420ms">Move your cursor. Click anywhere.</p>
     </div>
   </section>
 
@@ -632,6 +710,202 @@ uv tool install --editable . --with textual</pre>
     });
   }, { rootMargin: "0px 0px -12% 0px" });
   targets.forEach(function (el) { io.observe(el); });
+})();
+
+/* ── Kinetic grid ──────────────────────────────────────────────────────────
+   Ported from the React KineticGrid to plain canvas. Three changes from the
+   original: it scales for devicePixelRatio so the lines stay crisp, it only
+   runs while the hero is on screen (an off-screen rAF loop burns battery for
+   nothing), and reduced-motion gets a single static frame instead of the loop.
+*/
+(function () {
+  var canvas = document.getElementById("grid");
+  if (!canvas || !canvas.getContext) return;
+  var ctx = canvas.getContext("2d");
+  var hero = document.getElementById("hero");
+
+  var CELL = 55, INFLUENCE = 260, MAX_WARP = 24, DOT = 28, LERP = 0.08;
+  var LINE_BASE = { r: 255, g: 255, b: 255, a: 0.13 };
+  var NODE_MIN = 1.8, NODE_MAX = 3.2;
+  var THEME = {
+    bg: "#0e1014",
+    line: { r: 46, g: 139, b: 255, a: 0.9 },   // site blue
+    node: { r: 124, g: 196, b: 255, a: 1.0 },
+    glow: "46,139,255",
+    ripple: "255,122,26"                        // site orange
+  };
+
+  var mouse = { x: -9999, y: -9999 }, target = { x: -9999, y: -9999 };
+  var ripples = [], raf = 0, W = 0, H = 0, running = false;
+  var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function mix(base, active, t) {
+    return "rgba(" + Math.round(lerp(base.r, active.r, t)) + "," +
+      Math.round(lerp(base.g, active.g, t)) + "," +
+      Math.round(lerp(base.b, active.b, t)) + "," +
+      lerp(base.a, active.a, t).toFixed(3) + ")";
+  }
+
+  function resize() {
+    var rect = hero.getBoundingClientRect();
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = Math.max(1, rect.width);
+    H = Math.max(1, rect.height);
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function warp(gx, gy, col, row, cols, rows) {
+    var margin = 1.5;
+    var cp = Math.min(col / margin, (cols - 1 - col) / margin, 1);
+    var rp = Math.min(row / margin, (rows - 1 - row) / margin, 1);
+    var pin = cp * cp * rp * rp;
+
+    var dx = gx - mouse.x, dy = gy - mouse.y;
+    var dist = Math.sqrt(dx * dx + dy * dy);
+    var prox = Math.max(0, 1 - dist / INFLUENCE) * pin;
+
+    var rx = 0, ry = 0;
+    for (var i = 0; i < ripples.length; i++) {
+      var r = ripples[i];
+      var rdx = gx - r.x, rdy = gy - r.y;
+      var rdist = Math.sqrt(rdx * rdx + rdy * rdy);
+      var diff = rdist - r.radius;
+      if (Math.abs(diff) < 55) {
+        var st = (1 - Math.abs(diff) / 55) * r.opacity * 18 * pin;
+        var ang = Math.atan2(rdy, rdx);
+        var sign = diff < 0 ? -1 : 1;
+        rx += Math.cos(ang) * st * sign * -1;
+        ry += Math.sin(ang) * st * sign * -1;
+      }
+    }
+
+    if (dist < INFLUENCE && dist > 0 && pin > 0) {
+      var t = dist / INFLUENCE;
+      var eased = t < 0.01 ? 0 : (1 - t) * (1 - t) * Math.min(1, dist / 60);
+      var amt = eased * MAX_WARP * pin;
+      var a = Math.atan2(dy, dx);
+      return { x: gx - Math.cos(a) * amt + rx, y: gy - Math.sin(a) * amt + ry, p: prox };
+    }
+    return { x: gx + rx, y: gy + ry, p: prox };
+  }
+
+  function draw(now) {
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = THEME.bg;
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.fillStyle = "rgba(255,255,255,0.05)";
+    for (var x = DOT / 2; x < W; x += DOT) {
+      for (var y = DOT / 2; y < H; y += DOT) {
+        ctx.beginPath(); ctx.arc(x, y, 0.7, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+
+    for (var i = ripples.length - 1; i >= 0; i--) {
+      var age = (now - ripples[i].born) / 1000;
+      ripples[i].radius = Math.max(0, age * 400);
+      ripples[i].opacity = Math.max(0, 1 - age * 1.2);
+      if (ripples[i].opacity <= 0) ripples.splice(i, 1);
+    }
+
+    var cols = Math.max(2, Math.ceil(W / CELL)) + 1;
+    var rows = Math.max(2, Math.ceil(H / CELL)) + 1;
+    var cw = W / (cols - 1), ch = H / (rows - 1);
+    var pts = [], row, col;
+
+    for (row = 0; row < rows; row++) {
+      pts[row] = [];
+      for (col = 0; col < cols; col++) pts[row][col] = warp(col * cw, row * ch, col, row, cols, rows);
+    }
+
+    function seg(a, b) {
+      var avg = (a.p + b.p) / 2;
+      var t = avg * avg * (3 - 2 * avg);
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+      ctx.strokeStyle = mix(LINE_BASE, THEME.line, t);
+      ctx.lineWidth = lerp(0.8, 1.5, t);
+      ctx.stroke();
+    }
+    for (row = 0; row < rows; row++)
+      for (col = 0; col < cols - 1; col++) seg(pts[row][col], pts[row][col + 1]);
+    for (col = 0; col < cols; col++)
+      for (row = 0; row < rows - 1; row++) seg(pts[row][col], pts[row + 1][col]);
+
+    for (row = 0; row < rows; row++) {
+      for (col = 0; col < cols; col++) {
+        var pt = pts[row][col];
+        var t2 = pt.p * pt.p * (3 - 2 * pt.p);
+        var rad = lerp(NODE_MIN, NODE_MAX, t2);
+        if (t2 > 0.3) {
+          var gr = rad + lerp(0, 6, (t2 - 0.3) / 0.7);
+          var grd = ctx.createRadialGradient(pt.x, pt.y, rad * 0.5, pt.x, pt.y, gr);
+          grd.addColorStop(0, "rgba(" + THEME.glow + "," + (t2 * 0.3).toFixed(3) + ")");
+          grd.addColorStop(1, "rgba(" + THEME.glow + ",0)");
+          ctx.beginPath(); ctx.arc(pt.x, pt.y, gr, 0, Math.PI * 2);
+          ctx.fillStyle = grd; ctx.fill();
+        }
+        ctx.beginPath(); ctx.arc(pt.x, pt.y, rad, 0, Math.PI * 2);
+        ctx.fillStyle = mix({ r: 255, g: 255, b: 255, a: 0.2 }, THEME.node, t2);
+        ctx.fill();
+      }
+    }
+
+    for (var k = 0; k < ripples.length; k++) {
+      ctx.beginPath();
+      ctx.arc(ripples[k].x, ripples[k].y, Math.max(0, ripples[k].radius), 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(" + THEME.ripple + "," + (ripples[k].opacity * 0.3).toFixed(3) + ")";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+  }
+
+  function frame(now) {
+    mouse.x = lerp(mouse.x, target.x, LERP);
+    mouse.y = lerp(mouse.y, target.y, LERP);
+    draw(now);
+    raf = requestAnimationFrame(frame);
+  }
+  function start() { if (!running && !reduce) { running = true; raf = requestAnimationFrame(frame); } }
+  function stop() { if (running) { running = false; cancelAnimationFrame(raf); } }
+
+  resize();
+  window.addEventListener("resize", function () { resize(); if (!running) draw(performance.now()); });
+
+  if (reduce) { draw(performance.now()); return; }
+
+  hero.addEventListener("mousemove", function (e) {
+    var r = hero.getBoundingClientRect();
+    target.x = e.clientX - r.left; target.y = e.clientY - r.top;
+  });
+  hero.addEventListener("mouseleave", function () { target.x = -9999; target.y = -9999; });
+  hero.addEventListener("click", function (e) {
+    var r = hero.getBoundingClientRect();
+    ripples.push({ x: e.clientX - r.left, y: e.clientY - r.top, radius: 0, opacity: 1, born: performance.now() });
+  });
+
+  if ("IntersectionObserver" in window) {
+    new IntersectionObserver(function (en) {
+      en[0].isIntersecting ? start() : stop();
+    }, { threshold: 0 }).observe(hero);
+  } else { start(); }
+})();
+
+/* page-load stagger */
+document.body.classList.add("js");
+requestAnimationFrame(function () { document.body.classList.add("loaded"); });
+
+/* header flips from dark-hero mode to glass once you scroll past the hero */
+(function () {
+  var head = document.querySelector("header");
+  var hero = document.getElementById("hero");
+  if (!head || !hero || !("IntersectionObserver" in window)) return;
+  new IntersectionObserver(function (en) {
+    head.classList.toggle("over-hero", en[0].isIntersecting);
+  }, { rootMargin: "-70px 0px 0px 0px" }).observe(hero);
 })();
 </script>
 </body>
