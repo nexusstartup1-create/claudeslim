@@ -1,0 +1,91 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "claudeslim"
+version = "0.1.0"
+description = "AST-based codebase & git-diff compressor that slashes token usage for Claude Code."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "ClaudeSlim contributors" }]
+keywords = ["claude", "llm", "tokens", "ast", "cli", "context-window", "compression"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3.10",
+  "Topic :: Software Development :: Pre-processors",
+]
+dependencies = [
+  "typer>=0.12.0",
+  "rich>=13.7.0",
+]
+
+[project.optional-dependencies]
+tui = ["textual>=0.79"]
+exact = ["anthropic>=0.40"]
+clipboard = ["pyperclip>=1.9"]
+gitignore = ["pathspec>=0.12"]
+all = ["textual>=0.79", "anthropic>=0.40", "pyperclip>=1.9", "pathspec>=0.12"]
+dev = ["pytest>=8.0", "mypy>=1.10", "ruff>=0.5"]
+
+[project.scripts]
+# NB: no `claudeslim` alias — that name is taken on PyPI by an unrelated
+# project, and installing the alias shadows its binary. `cslim` is the identity.
+cslim = "cslim.main:main"
+
+[project.urls]
+Homepage = "https://github.com/your-org/claudeslim"
+Issues = "https://github.com/your-org/claudeslim/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["cslim"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+# Explicit set: linting must mean the same thing on every machine, whatever
+# global ruff config a contributor happens to have.
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
+ignore = [
+  # Typer's whole API is `param: T = typer.Option(...)` in the signature.
+  "B008",
+  # `Optional[List[str]]` is deliberate: Typer resolves annotations at runtime.
+  "UP006", "UP007", "UP045",
+  "UP035",  # same reason: `typing.List` in Typer signatures
+  "E501",   # line length is enforced by the formatter, not the linter
+  "SIM108", # a plain if/else often reads better than a nested ternary
+  # `×` and `—` are the right glyphs in our strings, comments and docstrings.
+  "RUF001", "RUF002", "RUF003",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# A hook and a compressor must degrade, never crash the caller: the blind
+# catches in these modules are the documented design, not an oversight.
+"cslim/core/hook.py" = ["BLE001"]
+"cslim/core/compressor.py" = ["BLE001"]
+"cslim/core/tokenizer.py" = ["BLE001"]
+"cslim/core/claude_pipe.py" = ["BLE001"]
+"cslim/core/discovery.py" = ["BLE001"]
+"cslim/cli.py" = ["BLE001"]
+# `BINDINGS` as a class-level list is Textual's documented API.
+"cslim/tui/app.py" = ["BLE001", "RUF012"]
+
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_unused_ignores = false
+
+# Optional extras: imported behind try/except, never required to type-check.
+[[tool.mypy.overrides]]
+module = ["anthropic.*", "tiktoken.*", "pyperclip.*", "pathspec.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
