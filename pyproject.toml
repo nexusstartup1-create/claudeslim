@@ -38,8 +38,8 @@ dev = ["pytest>=8.0", "mypy>=1.10", "ruff>=0.5"]
 cslim = "cslim.main:main"
 
 [project.urls]
-Homepage = "https://github.com/your-org/claudeslim"
-Issues = "https://github.com/your-org/claudeslim/issues"
+Homepage = "https://github.com/nexusstartup1-create/claudeslim"
+Issues = "https://github.com/nexusstartup1-create/claudeslim/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["cslim"]

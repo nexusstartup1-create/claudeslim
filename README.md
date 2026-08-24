@@ -121,8 +121,8 @@ unrelated project. `cslim` is not published to PyPI; install from source.
 Requires **Python 3.10+** and git.
 
 ```bash
-git clone <repo-url> cslim
-cd cslim
+git clone https://github.com/nexusstartup1-create/claudeslim.git
+cd claudeslim
 
 # recommended: a global `cslim` command (needs https://docs.astral.sh/uv/)
 uv tool install --editable . --with textual
