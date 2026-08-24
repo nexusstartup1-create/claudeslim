@@ -115,10 +115,10 @@ down to very tight budgets: files lose depth, not existence.
 
 ## Install
 
-**Do not `pip install claudeslim`** — that name on PyPI belongs to a different,
-unrelated project. `cslim` is not published to PyPI; install from source.
-
 Requires **Python 3.10+** and git.
+
+> The distribution is **`cslim`**. `claudeslim` on PyPI is a different,
+> unrelated project — don't install that one by mistake.
 
 ```bash
 git clone https://github.com/nexusstartup1-create/claudeslim.git
