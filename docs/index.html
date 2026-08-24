@@ -350,6 +350,22 @@ header.over-hero nav a:hover { color: #fff; }
 }
 .copy:hover { color: var(--accent); border-color: var(--accent); }
 
+
+/* ---------- parallax ---------- */
+/* Depth is assigned by meaning, not decoration: the heavy panel lags, the
+   compressed one floats. Transform only — never top/margin — so it stays on
+   the compositor and never triggers layout. */
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+[data-px] { will-change: transform; }
+@media (prefers-reduced-motion: reduce) {
+  [data-px] { transform: none !important; will-change: auto; transition: none; }
+}
+
+.compare > .panel:first-child { --depth: 1; }
+.compare > .panel:last-child  { --depth: 2; }
+
 /* ---------- code compare ---------- */
 .compare { display: grid; gap: 1.25rem; grid-template-columns: 1fr; }
 @media (min-width: 900px) { .compare { grid-template-columns: 1fr 1fr; align-items: start; } }
@@ -511,7 +527,7 @@ footer { border-top: 1px solid var(--rule); padding-block: 3rem; }
 
   <section class="hero" id="hero">
     <canvas id="grid" aria-hidden="true"></canvas>
-    <div class="wrap hero-inner">
+    <div class="wrap hero-inner" data-px="-60" data-px-from="top">
       <p class="eyebrow anim" style="--d:0ms">Context optimizer for Claude Code</p>
       <h1 class="anim" style="--d:80ms">Token count is <span>not cost.</span></h1>
       <p class="lede anim" style="--d:160ms">A context-window optimizer for Claude Code — and the benchmarks that say when not to use it.</p>
@@ -534,7 +550,7 @@ footer { border-top: 1px solid var(--rule); padding-block: 3rem; }
       <h2>Keep the skeleton. Drop the body.</h2>
       <p class="lede">A real AST parser reads your repo and keeps signatures, types, class hierarchies and imports. Every function body goes.</p>
       <div class="compare" style="margin-top:1rem">
-        <div class="glass panel">
+        <div class="glass panel" data-px="34">
           <div class="panel-label"><span>What Claude reads today</span><b>134 tokens</b></div>
 <pre><span class="k">def</span> copy_to_clipboard(text: str) -&gt; str:
     <span class="c">"""Copy text to the clipboard; returns the backend."""</span>
@@ -553,7 +569,7 @@ footer { border-top: 1px solid var(--rule); padding-block: 3rem; }
     <span class="k">except</span> Exception <span class="k">as</span> exc:
         <span class="k">raise</span> ClipboardError(<span class="s">"no backend ..."</span>) <span class="k">from</span> exc</pre>
         </div>
-        <div class="glass panel">
+        <div class="glass panel" data-px="-26">
           <div class="panel-label win"><span>What Claude reads with cslim</span><b>35 tokens</b></div>
 <pre><span class="k">def</span> copy_to_clipboard(text: str) -&gt; str:
     <span class="c">"""Copy ``text`` to the clipboard; returns the backend."""</span>
@@ -566,10 +582,10 @@ footer { border-top: 1px solid var(--rule); padding-block: 3rem; }
 
   <section id="benchmarks" class="invert">
     <div class="wrap stack">
-      <p class="eyebrow">The finding</p>
-      <h2>I benchmarked it. It cost more.</h2>
+      <p class="eyebrow" data-px="26">The finding</p>
+      <h2 data-px="16">I benchmarked it. It cost more.</h2>
       <p class="lede">Every configuration of the automatic map cost more than sending nothing. Real Claude Code sessions, reading Anthropic's own <code>total_cost_usd</code> out of <code>claude -p --output-format json</code>. Nothing estimated.</p>
-      <div class="scroller" style="margin-top:0.5rem">
+      <div class="scroller" data-px="-18" style="margin-top:0.5rem">
         <table>
           <caption class="note" style="text-align:left;padding:0.8rem 1rem 0">pallets/flask — 80 files, 12 turns, 3 sessions per arm</caption>
           <thead><tr><th>Map</th><th class="num">Cost / session</th><th class="num">vs control</th></tr></thead>
@@ -588,7 +604,7 @@ footer { border-top: 1px solid var(--rule); padding-block: 3rem; }
     <div class="wrap stack">
       <p class="eyebrow">Why</p>
       <h2>The caching math</h2>
-      <p class="quote">One token of freshly injected context costs roughly what <b>twelve cache-read tokens</b> cost.</p>
+      <p class="quote" data-px="20">One token of freshly injected context costs roughly what <b>twelve cache-read tokens</b> cost.</p>
       <p>Anthropic bills a cache write at ~1.25× base input and a cache read at ~0.1×. Claude Code's exploration is almost entirely cache reads — re-reading a file it already pulled is nearly free. A map has to prevent ~12× its own size in exploration just to break even.</p>
 
       <h3 style="margin-top:1.5rem">Shrinking the map doesn't help</h3>
@@ -906,6 +922,55 @@ requestAnimationFrame(function () { document.body.classList.add("loaded"); });
   new IntersectionObserver(function (en) {
     head.classList.toggle("over-hero", en[0].isIntersecting);
   }, { rootMargin: "-70px 0px 0px 0px" }).observe(hero);
+})();
+
+/* ── Scroll parallax ───────────────────────────────────────────────────────
+   The GSAP/Lenis original is replaced by ~30 lines: one rAF-throttled scroll
+   pass writing translate3d, which the compositor handles without layout. No
+   smooth-scroll hijack — native scrolling is left alone, and anchors use CSS
+   scroll-behavior instead.
+
+   Depth encodes meaning here rather than decorating: in the before/after pair
+   the 134-token panel lags behind and the 35-token one floats ahead, so the
+   weight difference is something you feel while scrolling.
+*/
+(function () {
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  var layers = Array.prototype.slice.call(document.querySelectorAll("[data-px]"));
+  if (!layers.length) return;
+
+  var ticking = false, vh = window.innerHeight;
+
+  function apply() {
+    ticking = false;
+    for (var i = 0; i < layers.length; i++) {
+      var el = layers[i];
+      var speed = parseFloat(el.getAttribute("data-px")) || 0;
+      var rect = el.getBoundingClientRect();
+
+      // skip anything comfortably off screen
+      if (rect.bottom < -vh * 0.5 || rect.top > vh * 1.5) continue;
+
+      var progress;
+      if (el.getAttribute("data-px-from") === "top") {
+        // hero: 0 at rest, 1 once scrolled a full viewport away
+        progress = Math.min(1, Math.max(0, -rect.top / vh));
+      } else {
+        // element centre relative to viewport centre, normalised to -1..1
+        progress = ((rect.top + rect.height / 2) - vh / 2) / vh;
+        progress = Math.max(-1.2, Math.min(1.2, progress));
+      }
+      el.style.transform = "translate3d(0," + (progress * speed).toFixed(2) + "px,0)";
+    }
+  }
+
+  function onScroll() {
+    if (!ticking) { ticking = true; requestAnimationFrame(apply); }
+  }
+
+  window.addEventListener("scroll", onScroll, { passive: true });
+  window.addEventListener("resize", function () { vh = window.innerHeight; onScroll(); });
+  apply();
 })();
 </script>
 </body>
