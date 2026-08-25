@@ -32,3 +32,6 @@ bench/.inject/
 # OS
 .DS_Store
 Thumbs.db
+
+# source archive for the 3D model (the processed .glb is committed instead)
+*.rar

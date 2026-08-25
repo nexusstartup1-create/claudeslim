@@ -390,8 +390,14 @@ footer a { color: var(--amber); text-decoration: none; }
     road.add(new THREE.Line(g, new THREE.LineBasicMaterial({ color: NEON, transparent: true, opacity: 0.85 })));
   });
 
-  // ── low-poly car ──────────────────────────────────────────────────────────
+  // ── car ───────────────────────────────────────────────────────────────────
+  // carRig carries position and steering; the shell inside it carries the
+  // facing. The scene travels toward -Z, so the nose must point that way —
+  // the primitive parts below are authored nose-to-+Z and flipped once here.
+  var carRig = new THREE.Group();
   var car = new THREE.Group();
+  car.rotation.y = Math.PI;
+  carRig.add(car);
   function metal(c, e, ei) {
     return new THREE.MeshStandardMaterial({ color: c, metalness: 0.85, roughness: 0.32, emissive: e || 0x000000, emissiveIntensity: ei || 0 });
   }
@@ -422,19 +428,52 @@ footer a { color: var(--amber); text-decoration: none; }
   // underglow
   var glow = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 6),
     new THREE.MeshBasicMaterial({ color: NEON, transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false }));
-  glow.rotation.x = -Math.PI / 2; glow.position.y = 0.03; car.add(glow);
+  glow.rotation.x = -Math.PI / 2; glow.position.y = 0.03; carRig.add(glow);
 
   var headlight = new THREE.SpotLight(AMBER, 120, 55, 0.42, 0.45, 1.4);
-  headlight.position.set(0, 0.85, 2.9);
-  headlight.target.position.set(0, 0, 30);
-  car.add(headlight); car.add(headlight.target);
+  headlight.position.set(0, 0.85, -2.9);
+  headlight.target.position.set(0, 0, -30);
+  carRig.add(headlight); carRig.add(headlight.target);
 
   // laser (leg 01)
   var laser = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.32, 26, 8, 1, true),
     new THREE.MeshBasicMaterial({ color: AMBER, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
-  laser.rotation.x = Math.PI / 2; laser.position.set(0, 0.7, 15); car.add(laser);
+  laser.rotation.x = Math.PI / 2; laser.position.set(0, 0.7, -15); carRig.add(laser);
 
-  road.add(car);
+  road.add(carRig);
+
+  // ── DeLorean ──────────────────────────────────────────────────────────────
+  // The primitive shell above stays in the scene graph until the model lands,
+  // so a failed or slow fetch still leaves a car on the road rather than a hole.
+  var primitiveShell = car;
+  var loader = new THREE.GLTFLoader();
+  loader.load("./delorean.glb", function (gltf) {
+    var model = gltf.scene;
+    var paint = new THREE.MeshStandardMaterial({
+      color: 0x1b1b21, metalness: 0.92, roughness: 0.28,
+      emissive: COPPER, emissiveIntensity: 0.06
+    });
+    model.traverse(function (o) {
+      if (!o.isMesh) return;
+      // the STL carries no normals; smooth them so the paint reads as metal
+      o.geometry.computeVertexNormals();
+      o.material = paint;
+      o.castShadow = false; o.receiveShadow = false;
+      var wire = new THREE.LineSegments(
+        new THREE.EdgesGeometry(o.geometry, 32),
+        new THREE.LineBasicMaterial({ color: AMBER, transparent: true, opacity: 0.55 })
+      );
+      o.add(wire);
+    });
+    // already centred, scaled and facing -Z at export time
+    carRig.add(model);
+    // retire the stand-in, but keep the lights and effects parented to the rig
+    primitiveShell.traverse(function (o) {
+      if (o.isMesh || o.isLineSegments || o.isLine) o.visible = false;
+    });
+  }, undefined, function () {
+    /* keep the primitive car — nothing else to do */
+  });
 
   // ── obstacles: the noise ──────────────────────────────────────────────────
   function labelTexture(text) {
@@ -581,10 +620,10 @@ footer a { color: var(--amber); text-decoration: none; }
 
     // car travels the highway; scroll is the throttle
     var cz = CAR_START + (CAR_END - CAR_START) * p;
-    car.position.z = cz;
-    car.position.x = Math.sin(p * 9) * 1.6 * (p > 0.06 ? 1 : 0);
-    car.rotation.y = -Math.cos(p * 9) * 0.06 * (p > 0.06 ? 1 : 0);
-    car.position.y = Math.sin(t * 7) * 0.012;
+    carRig.position.z = cz;
+    carRig.position.x = Math.sin(p * 9) * 1.6 * (p > 0.06 ? 1 : 0);
+    carRig.rotation.y = -Math.cos(p * 9) * 0.06 * (p > 0.06 ? 1 : 0);
+    carRig.position.y = Math.sin(t * 7) * 0.012;
 
     // idle heat shimmer at the start line
     var idling = p < 0.04;
@@ -593,11 +632,11 @@ footer a { color: var(--amber); text-decoration: none; }
     // chase camera, easing wider through the tunnel
     var wide = Math.max(0, Math.min(1, (p - 0.34) / 0.2));
     camera.position.set(
-      car.position.x * 0.55 + Math.sin(t * 0.4) * 0.35,
+      carRig.position.x * 0.55 + Math.sin(t * 0.4) * 0.35,
       3.5 + wide * 1.6,
       cz + 11.5 + wide * 3.5
     );
-    camera.lookAt(car.position.x * 0.6, 1.5 + wide * 1.4, cz - 12);
+    camera.lookAt(carRig.position.x * 0.6, 1.5 + wide * 1.4, cz - 12);
 
     rim.position.z = cz - 10;
 
