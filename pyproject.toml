@@ -26,10 +26,22 @@ dependencies = [
 
 [project.optional-dependencies]
 tui = ["textual>=0.79"]
+# Grammar-backed skeletons for JS/TS/Go. Without it the heuristic scanner is
+# used and its output is marked `fallback`.
+treesitter = [
+  "tree-sitter>=0.23",
+  "tree-sitter-javascript>=0.23",
+  "tree-sitter-typescript>=0.23",
+  "tree-sitter-go>=0.23",
+]
 exact = ["anthropic>=0.40"]
 clipboard = ["pyperclip>=1.9"]
 gitignore = ["pathspec>=0.12"]
-all = ["textual>=0.79", "anthropic>=0.40", "pyperclip>=1.9", "pathspec>=0.12"]
+all = [
+  "textual>=0.79", "anthropic>=0.40", "pyperclip>=1.9", "pathspec>=0.12",
+  "tree-sitter>=0.23", "tree-sitter-javascript>=0.23",
+  "tree-sitter-typescript>=0.23", "tree-sitter-go>=0.23",
+]
 dev = ["pytest>=8.0", "mypy>=1.10", "ruff>=0.5"]
 
 [project.scripts]
@@ -85,7 +97,9 @@ warn_unused_ignores = false
 
 # Optional extras: imported behind try/except, never required to type-check.
 [[tool.mypy.overrides]]
-module = ["anthropic.*", "tiktoken.*", "pyperclip.*", "pathspec.*"]
+module = ["anthropic.*", "tiktoken.*", "pyperclip.*", "pathspec.*",
+  "tree_sitter", "tree_sitter.*", "tree_sitter_javascript",
+  "tree_sitter_typescript", "tree_sitter_go"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

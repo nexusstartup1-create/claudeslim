@@ -131,6 +131,23 @@ def copy_to_clipboard(text: str) -> str:
     ...
 ```
 
+Brace languages are parsed with **tree-sitter** when the grammar is installed
+(`pip install -e '.[treesitter]'`), and with the brace-counting scanner
+otherwise. Which one ran is recorded: scanner output is marked `fallback` and
+carries the reason.
+
+A corpus test compresses nine real files from nine well-known projects — node,
+vue, jquery, vscode, axios, zod, the Go standard library, hugo and cobra — and
+asserts the output stays balanced, keeps its declarations and loses its bodies.
+It found the difference the grammar exists for: on `zod`'s `schemas.ts` the
+scanner leaves **81 unclosed parentheses** in dense generics, where the grammar
+path is balanced on every file it can parse.
+
+It also found the grammar's own limit. That same zod file uses TypeScript 4.7
+variance annotations (`out Output = unknown`), which `tree-sitter-typescript`
+0.23 cannot parse — so cslim falls back to the scanner, sets `fallback` and
+records why, rather than emitting a half-parsed skeleton.
+
 | project | source | skeleton map |
 | --- | --- | --- |
 | cslim | 43.9k tokens | 9.8k (−77.7%) |

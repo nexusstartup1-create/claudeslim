@@ -39,7 +39,7 @@ jobs:
           uv venv
           # [tui] too: cslim/tui/app.py is type-checked, so textual must be
           # present or `mypy cslim` passes locally and fails here.
-          uv pip install -e ".[dev,tui]"
+          uv pip install -e ".[dev,tui,treesitter]"
       - name: Tests
         run: uv run pytest -q
       - name: Types

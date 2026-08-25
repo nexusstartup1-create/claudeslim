@@ -783,6 +783,30 @@ _REGISTRY: dict[Language, Compressor] = {
 _FALLBACK: Compressor = GenericCompressor()
 
 
+def _install_treesitter() -> list[Language]:
+    """Swap in grammar-backed backends for whatever grammars are installed.
+
+    This is the whole integration: the registry was built for it, so no caller
+    outside this module learns which backend ran. A language with no grammar
+    keeps the heuristic scanner, and its output keeps saying ``fallback``.
+    """
+    try:
+        from .treesitter import SPECS, TreeSitterCompressor, load_parser
+    except ImportError:  # pragma: no cover - tree_sitter not installed at all
+        return []
+
+    installed: list[Language] = []
+    for language in SPECS:
+        if load_parser(language) is None:
+            continue
+        _REGISTRY[language] = TreeSitterCompressor(language)
+        installed.append(language)
+    return installed
+
+
+TREESITTER_LANGUAGES: list[Language] = _install_treesitter()
+
+
 def register_compressor(language: Language, compressor: Compressor) -> None:
     """Plug in (or override) a backend — e.g. a tree-sitter powered one."""
     _REGISTRY[language] = compressor
