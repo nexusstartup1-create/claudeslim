@@ -40,6 +40,11 @@ jobs:
           # [tui] too: cslim/tui/app.py is type-checked, so textual must be
           # present or `mypy cslim` passes locally and fails here.
           uv pip install -e ".[dev,tui,treesitter]"
+      # The corpus is third-party source, fetched rather than committed. Without
+      # this step the corpus tests collect zero cases and vanish silently — the
+      # suite would still be green while checking nothing about real files.
+      - name: Fetch corpus
+        run: bash tests/fetch_corpus.sh
       - name: Tests
         run: uv run pytest -q
       - name: Types

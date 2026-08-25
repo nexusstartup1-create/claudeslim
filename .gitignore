@@ -42,3 +42,8 @@ docs/
 
 # empty Next.js scaffold, kept locally
 cslim-site/
+
+# third-party corpus: fetched with tests/fetch_corpus.sh, never committed
+tests/fixtures/corpus/*.js
+tests/fixtures/corpus/*.ts
+tests/fixtures/corpus/*.go
