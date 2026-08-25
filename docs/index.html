@@ -7,519 +7,255 @@
 <meta name="description" content="A context-window optimizer for Claude Code, and the benchmarks that say when not to use it.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=DM+Sans:wght@400;500&family=JetBrains+Mono:wght@400;500;700&display=swap">
 <style>
+/* ── tokens ─────────────────────────────────────────────────────────────────
+   One committed visual world: white paper, black ink, alternating bands.
+   A dark theme would fight the alternation that *is* the design, so every
+   colour is painted explicitly instead of inherited from the host.
+*/
 :root {
-  --white: #ffffff;
-  --mist: #f4f7fb;
-  --ink: #0a0c10;
-  --slate: #5a6373;
-  --blue: #2e8bff;
-  --blue-sky: #7cc4ff;
-  --orange: #ff7a1a;
-  --orange-w: #ffb067;
+  --paper:  #ffffff;
+  --ink:    #0b0b0b;
+  --orange: #ff5a1f;   /* brand · every cost figure */
+  --sky:    #4da6ff;   /* interaction · every measured win */
+  --grey:   #6b6b6b;
+  --grey-d: #9a9a9a;   /* muted text on ink bands */
 
-  --canvas: var(--white);
-  --surface: var(--mist);
-  --code-bg: #f7f9fc;
-  --text: var(--ink);
-  --text-muted: var(--slate);
-  --rule: rgba(10, 12, 16, 0.10);
-  --accent: var(--blue);
-  --brand: var(--orange);
+  --edge: 3px;
+  --drop: 6px;
 
-  --glass-bg: rgba(255, 255, 255, 0.55);
-  --glass-border: rgba(255, 255, 255, 0.75);
-  --glass-inset: rgba(255, 255, 255, 0.9);
-  --glass-shadow: rgba(10, 12, 16, 0.18);
-  --bloom-a: rgba(124, 196, 255, 0.55);
-  --bloom-b: rgba(255, 176, 103, 0.45);
-  --bloom-opacity: 0.85;
+  --display: "Bricolage Grotesque", "Helvetica Neue", Arial, sans-serif;
+  --body: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 
-  --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
-  --body: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-
-  --measure: 66ch;
-  --gap: clamp(5rem, 10vw, 8rem);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --canvas: #07090d;
-    --surface: #11151d;
-    --code-bg: #12151c;
-    --text: #f2f5f9;
-    --text-muted: #949dad;
-    --rule: rgba(255, 255, 255, 0.12);
-    --accent: #6cb0ff;
-    --brand: #ff9445;
-    --glass-bg: rgba(255, 255, 255, 0.07);
-    --glass-border: rgba(255, 255, 255, 0.14);
-    --glass-inset: rgba(255, 255, 255, 0.10);
-    --glass-shadow: rgba(0, 0, 0, 0.55);
-    --bloom-a: rgba(46, 139, 255, 0.40);
-    --bloom-b: rgba(255, 122, 26, 0.30);
-    --bloom-opacity: 0.7;
-  }
-}
-
-:root[data-theme="dark"] {
-  --canvas: #07090d;
-  --surface: #11151d;
-  --code-bg: #12151c;
-  --text: #f2f5f9;
-  --text-muted: #949dad;
-  --rule: rgba(255, 255, 255, 0.12);
-  --accent: #6cb0ff;
-  --brand: #ff9445;
-  --glass-bg: rgba(255, 255, 255, 0.07);
-  --glass-border: rgba(255, 255, 255, 0.14);
-  --glass-inset: rgba(255, 255, 255, 0.10);
-  --glass-shadow: rgba(0, 0, 0, 0.55);
-  --bloom-a: rgba(46, 139, 255, 0.40);
-  --bloom-b: rgba(255, 122, 26, 0.30);
-  --bloom-opacity: 0.7;
+  --band: clamp(4.5rem, 9vw, 7.5rem);
 }
 
 * { box-sizing: border-box; }
-
+html { scroll-behavior: smooth; }
 body {
   margin: 0;
-  background: var(--canvas);
-  color: var(--text);
+  background: var(--paper);
+  color: var(--ink);
   font-family: var(--body);
   font-size: 17px;
-  line-height: 1.65;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
 }
 
-.bloom {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  opacity: var(--bloom-opacity);
-}
-.bloom::before, .bloom::after {
-  content: "";
-  position: absolute;
-  width: 60vw;
-  height: 60vw;
-  min-width: 420px;
-  min-height: 420px;
-  border-radius: 50%;
-  filter: blur(90px);
-}
-.bloom::before {
-  background: var(--bloom-a);
-  top: -18vw;
-  left: -10vw;
-  animation: drift-a 48s ease-in-out infinite alternate;
-}
-.bloom::after {
-  background: var(--bloom-b);
-  top: 42vh;
-  right: -18vw;
-  animation: drift-b 62s ease-in-out infinite alternate;
-}
-@keyframes drift-a { to { transform: translate3d(4vw, 3vh, 0); } }
-@keyframes drift-b { to { transform: translate3d(-5vw, -4vh, 0); } }
+.wrap { width: min(100% - 2.5rem, 1100px); margin-inline: auto; }
 
-.wrap {
-  width: min(100% - 2.5rem, 1080px);
-  margin-inline: auto;
-}
+/* ── bands ─────────────────────────────────────────────────────────────────
+   Sections alternate paper and ink full-bleed. `.on-ink` flips every token
+   that has to change, so nothing inherits the wrong ground.
+*/
+.band { padding-block: var(--band); border-bottom: var(--edge) solid var(--ink); }
+.band.on-ink { background: var(--ink); color: var(--paper); }
+.on-ink .muted { color: var(--grey-d); }
+.on-ink .box { background: var(--ink); border-color: var(--paper); box-shadow: var(--drop) var(--drop) 0 var(--orange); }
+.on-ink .tag { border-color: var(--paper); }
+.on-ink th { color: var(--grey-d); border-bottom-color: var(--paper); }
+.on-ink td { border-bottom-color: rgba(255,255,255,0.18); }
+.on-ink a { color: var(--sky); }
+/* buttons and tagged blocks carry their own ground, so the ink-band link
+   colour must not reach them — it beat .btn on specificity and painted the
+   filled button sky-on-sky. */
+.on-ink a.btn, .on-ink a.box, .on-ink .tag { color: var(--ink); }
+.on-ink a.btn { background: var(--paper); }
+.on-ink a.btn.fill { background: var(--sky); }
+/* a black drop shadow is invisible on an ink band — the hard offset is the
+   whole brutalist signature, so it switches to orange like the tables do. */
+.on-ink .btn { box-shadow: var(--drop) var(--drop) 0 var(--orange); }
+.on-ink .btn:hover { box-shadow: 3px 3px 0 var(--orange); }
+.on-ink pre { background: #141414; border-color: var(--paper); color: var(--paper); }
 
-.glass {
-  background: var(--glass-bg);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
-  border: 1px solid var(--glass-border);
-  border-radius: 20px;
-  box-shadow: 0 1px 0 var(--glass-inset) inset,
-              0 12px 40px -12px var(--glass-shadow);
-}
-@supports not (backdrop-filter: blur(1px)) {
-  .glass { background: rgba(255, 255, 255, 0.93); }
-  :root[data-theme="dark"] .glass { background: #141922; }
-}
+/* ── type ──────────────────────────────────────────────────────────────── */
+h1, h2, h3 { font-family: var(--display); font-weight: 800; margin: 0; line-height: 1; letter-spacing: -0.035em; text-wrap: balance; }
+h1 { font-size: clamp(3rem, 9vw, 6.5rem); text-transform: uppercase; }
+h2 { font-size: clamp(2.1rem, 5.5vw, 3.6rem); text-transform: uppercase; margin-bottom: 1.5rem; }
+h3 { font-size: 1.05rem; font-weight: 600; letter-spacing: -0.01em; line-height: 1.2; }
+p { margin: 0 0 1.1rem; max-width: 62ch; }
+.lede { font-size: clamp(1.1rem, 2.2vw, 1.35rem); line-height: 1.45; max-width: 40ch; }
+.muted { color: var(--grey); }
+.o { color: var(--orange); }
+.s { color: var(--sky); }
+strong { font-weight: 500; }
+a { color: var(--ink); text-underline-offset: 3px; text-decoration-thickness: 2px; }
 
-/* ---------- header ---------- */
-header {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  background: var(--glass-bg);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border-bottom: 1px solid var(--rule);
-}
-.bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.85rem 0;
-}
-.mark {
-  font-family: var(--mono);
-  font-weight: 600;
-  font-size: 1.05rem;
-  letter-spacing: -0.02em;
-  color: var(--text);
-  text-decoration: none;
-}
-.mark::before {
-  content: "▚";
-  color: var(--brand);
-  margin-right: 0.45rem;
-}
-.bar nav { display: flex; gap: 1.4rem; align-items: center; }
-.bar nav a {
-  font-size: 0.9rem;
-  color: var(--text-muted);
-  text-decoration: none;
-}
-.bar nav a:hover { color: var(--accent); }
-@media (max-width: 640px) { .bar nav .hide-sm { display: none; } }
-
-/* ---------- type ---------- */
-h1, h2, h3 {
-  font-family: var(--display);
-  font-weight: 600;
-  letter-spacing: -0.03em;
-  line-height: 1.08;
-  text-wrap: balance;
-  margin: 0;
-}
-h1 { font-size: clamp(2.6rem, 6.5vw, 4.6rem); font-weight: 700; }
-h2 { font-size: clamp(1.9rem, 4vw, 2.9rem); }
-h3 { font-size: 1.15rem; letter-spacing: -0.01em; }
-p { margin: 0; max-width: var(--measure); }
-.lede { font-size: clamp(1.05rem, 2vw, 1.25rem); color: var(--text-muted); }
-.eyebrow {
-  font-family: var(--mono);
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: var(--brand);
-  margin: 0 0 1rem;
-}
-.note { font-size: 0.88rem; color: var(--text-muted); }
-code, .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
-:not(pre) > code {
-  background: var(--surface);
-  border: 1px solid var(--rule);
-  border-radius: 6px;
-  padding: 0.1em 0.38em;
-  font-size: 0.88em;
-}
-a { color: var(--accent); }
-
-section { padding-block: var(--gap); }
-.stack { display: flex; flex-direction: column; gap: 1.4rem; }
-
-/* ---------- kinetic hero ---------- */
-.hero {
-  position: relative;
-  min-height: 100svh;
-  display: flex;
-  align-items: center;
-  padding-block: clamp(6rem, 14vh, 9rem) clamp(4rem, 10vh, 6rem);
-  background: #0e1014;
-  overflow: hidden;
-  isolation: isolate;
-}
-#grid {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  z-index: -1;
-  pointer-events: none;
-  display: block;
-}
-/* the hero is its own dark world: fixed colours, not theme tokens */
-.hero-inner { display: flex; flex-direction: column; gap: 1.4rem; }
-.hero h1 { color: #fff; }
-.hero h1 span { color: var(--orange); }
-.hero .lede { color: rgba(255, 255, 255, 0.62); }
-.hero .eyebrow { color: var(--orange-w); }
-.hero .terminal {
-  background: rgba(255, 255, 255, 0.07);
-  border-color: rgba(255, 255, 255, 0.14);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.1) inset, 0 12px 40px -12px rgba(0, 0, 0, 0.6);
-}
-.hero .terminal .cmd { color: rgba(255, 255, 255, 0.9); }
-.hero .copy { border-color: rgba(255, 255, 255, 0.2); color: rgba(255, 255, 255, 0.65); }
-.hero .copy:hover { color: #fff; border-color: var(--blue-sky); }
-.hero .btn-ghost {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.16);
-  color: #fff;
-}
-.hint {
-  font-family: var(--mono);
-  font-size: 0.76rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.35);
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-}
-.hint::before {
-  content: "";
-  width: 7px; height: 7px;
-  border-radius: 50%;
-  background: var(--orange);
-  animation: pulse 2.4s ease-in-out infinite;
-}
-@keyframes pulse {
-  0%, 100% { opacity: 0.35; transform: scale(1); }
-  50%      { opacity: 1;    transform: scale(1.35); }
-}
-
-/* entrance stagger */
-.anim { opacity: 1; }
-.js .anim { opacity: 0; transform: translateY(14px); }
-.js.loaded .anim {
-  animation: rise 0.75s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-  animation-delay: var(--d, 0ms);
-}
-@keyframes rise { to { opacity: 1; transform: none; } }
-
-/* header sits over the dark hero until you scroll past it */
-/* Default is the readable glass state, so a failed script leaves a usable
-   header rather than transparent nav over white. JS only opts INTO the
-   dark-hero variant. */
-header { transition: background 0.35s ease, border-color 0.35s ease; }
-header .mark, header nav a { transition: color 0.35s ease; }
-header.over-hero {
-  background: transparent;
-  border-bottom-color: transparent;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-}
-header.over-hero .mark { color: #fff; }
-header.over-hero nav a { color: rgba(255, 255, 255, 0.72); }
-header.over-hero nav a:hover { color: #fff; }
-
-.cta { display: flex; flex-wrap: wrap; gap: 0.75rem; }
-.btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-family: var(--body);
-  font-size: 0.95rem;
-  font-weight: 500;
-  padding: 0.7rem 1.3rem;
-  border-radius: 12px;
-  text-decoration: none;
-  border: 1px solid transparent;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-.btn-primary { background: var(--blue); color: #fff; }
-.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 28px -10px var(--blue); }
-.btn-ghost:hover { transform: translateY(-2px); }
-
-.terminal { padding: 0.9rem 1rem; display: flex; align-items: center; gap: 0.75rem; }
-.terminal .cmd {
-  font-family: var(--mono);
-  font-size: 0.86rem;
-  color: var(--text);
-  overflow-x: auto;
-  white-space: nowrap;
-  flex: 1;
-  scrollbar-width: none;
-}
-.terminal .cmd::-webkit-scrollbar { display: none; }
-.terminal .cmd::before { content: "$ "; color: var(--brand); }
-.copy {
-  font-family: var(--body);
-  font-size: 0.8rem;
-  padding: 0.4rem 0.75rem;
-  border-radius: 8px;
-  border: 1px solid var(--rule);
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  flex-shrink: 0;
-}
-.copy:hover { color: var(--accent); border-color: var(--accent); }
-
-
-/* ---------- parallax ---------- */
-/* Depth is assigned by meaning, not decoration: the heavy panel lags, the
-   compressed one floats. Transform only — never top/margin — so it stays on
-   the compositor and never triggers layout. */
-html { scroll-behavior: smooth; }
-@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
-
-[data-px] { will-change: transform; }
-@media (prefers-reduced-motion: reduce) {
-  [data-px] { transform: none !important; will-change: auto; transition: none; }
-}
-
-.compare > .panel:first-child { --depth: 1; }
-.compare > .panel:last-child  { --depth: 2; }
-
-/* ---------- code compare ---------- */
-.compare { display: grid; gap: 1.25rem; grid-template-columns: 1fr; }
-@media (min-width: 900px) { .compare { grid-template-columns: 1fr 1fr; align-items: start; } }
-.panel { padding: 1.1rem; }
-.panel-label {
-  font-family: var(--mono);
-  font-size: 0.76rem;
-  letter-spacing: 0.04em;
-  color: var(--text-muted);
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 0.75rem;
-}
-.panel-label b { color: var(--brand); font-weight: 600; }
-.panel-label.win b { color: var(--accent); }
-pre {
-  margin: 0;
-  background: var(--code-bg);
-  border: 1px solid var(--rule);
-  border-radius: 12px;
-  padding: 1rem;
-  overflow-x: auto;
-  font-family: var(--mono);
-  font-size: 0.8rem;
-  line-height: 1.6;
-  tab-size: 4;
-}
-.k { color: var(--blue); }
-.s { color: var(--brand); }
-.c { color: var(--text-muted); font-style: italic; }
-.d { color: var(--text-muted); }
-:root[data-theme="dark"] .k { color: var(--blue-sky); }
-
-/* ---------- inverted section ---------- */
-.invert {
-  background: var(--ink);
-  color: #f2f5f9;
-  position: relative;
-  isolation: isolate;
-}
-.invert h2, .invert h3 { color: #fff; }
-.invert p { color: #b6bece; }
-.invert .eyebrow { color: var(--orange-w); }
-.invert table { color: #e7ecf3; }
-.invert th { color: #8d97a8; border-color: rgba(255, 255, 255, 0.16); }
-.invert td { border-color: rgba(255, 255, 255, 0.09); }
-.invert .note { color: #8d97a8; }
-.invert .scroller { border-color: rgba(255, 255, 255, 0.12); background: rgba(255, 255, 255, 0.03); }
-
-/* ---------- tables ---------- */
-.scroller {
-  overflow-x: auto;
-  border: 1px solid var(--rule);
-  border-radius: 14px;
-  background: var(--code-bg);
-}
-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-family: var(--mono);
-  font-size: 0.85rem;
-  font-variant-numeric: tabular-nums;
-  min-width: 30rem;
-}
-th, td { padding: 0.7rem 1rem; text-align: left; white-space: nowrap; }
-th {
-  font-weight: 500;
-  font-size: 0.74rem;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--text-muted);
-  border-bottom: 1px solid var(--rule);
-}
-td { border-bottom: 1px solid var(--rule); }
-tr:last-child td { border-bottom: none; }
-td.num, th.num { text-align: right; }
-.cost { color: var(--brand); font-weight: 600; }
-.good { color: var(--accent); font-weight: 600; }
-
-/* ---------- pull quote ---------- */
-.quote {
-  font-family: var(--display);
-  font-size: clamp(1.5rem, 3.4vw, 2.2rem);
-  font-weight: 500;
-  line-height: 1.25;
-  letter-spacing: -0.025em;
-  max-width: 22ch;
-  border-left: 3px solid var(--brand);
-  padding-left: 1.4rem;
-  text-wrap: balance;
-}
-.quote b { color: var(--brand); font-weight: 600; }
-
-/* ---------- mode cards ---------- */
-.modes { display: grid; gap: 1rem; grid-template-columns: 1fr; }
-@media (min-width: 760px) { .modes { grid-template-columns: repeat(2, 1fr); } }
-.mode { padding: 1.25rem 1.35rem; display: flex; flex-direction: column; gap: 0.5rem; }
-.mode .use { font-family: var(--mono); font-size: 0.9rem; color: var(--text); }
 .tag {
-  align-self: flex-start;
-  font-family: var(--mono);
-  font-size: 0.7rem;
-  letter-spacing: 0.06em;
+  display: inline-block;
+  font-family: var(--mono); font-weight: 700;
+  font-size: 0.68rem; letter-spacing: 0.16em; text-transform: uppercase;
+  border: var(--edge) solid var(--ink);
+  background: var(--orange); color: var(--ink);
+  padding: 0.3rem 0.7rem; margin-bottom: 1.5rem;
+}
+.tag.blue { background: var(--sky); }
+
+/* ── brutalist block ───────────────────────────────────────────────────── */
+.box {
+  background: var(--paper);
+  border: var(--edge) solid var(--ink);
+  box-shadow: var(--drop) var(--drop) 0 var(--ink);
+}
+/* the press: a hoverable block moves into its own shadow */
+a.box, button.box, .box.press { transition: transform 0.12s steps(2, end), box-shadow 0.12s steps(2, end); }
+a.box:hover, button.box:hover, .box.press:hover {
+  transform: translate(3px, 3px);
+  box-shadow: 3px 3px 0 var(--ink);
+}
+.on-ink a.box:hover, .on-ink .box.press:hover { box-shadow: 3px 3px 0 var(--orange); }
+
+/* ── header ────────────────────────────────────────────────────────────── */
+header {
+  position: sticky; top: 0; z-index: 30;
+  background: var(--paper);
+  border-bottom: var(--edge) solid var(--ink);
+}
+.bar { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem 1rem; padding: 0.7rem 0; flex-wrap: wrap; }
+.mark { font-family: var(--display); font-weight: 800; font-size: 1.35rem; letter-spacing: -0.05em; text-decoration: none; color: var(--ink); text-transform: uppercase; }
+.mark i { font-style: normal; color: var(--orange); }
+.bar nav { display: flex; flex-wrap: wrap; gap: 0.5rem 1.1rem; font-family: var(--mono); font-size: 0.78rem; font-weight: 500; }
+.bar nav a { text-decoration: none; color: var(--ink); border-bottom: 2px solid transparent; }
+.bar nav a:hover { border-bottom-color: var(--orange); }
+@media (max-width: 680px) { .bar nav .sm { display: none; } }
+@media (max-width: 460px) { .bar nav .md { display: none; } }
+
+/* ── hero ──────────────────────────────────────────────────────────────── */
+.hero { padding-block: clamp(3.5rem, 9vw, 6.5rem) var(--band); }
+.hero h1 { margin-bottom: 1.6rem; }
+.hero h1 em { font-style: normal; color: var(--orange); }
+.cta { display: flex; flex-wrap: wrap; gap: 0.9rem; margin-top: 2rem; }
+.btn {
+  font-family: var(--mono); font-weight: 700; font-size: 0.85rem;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  padding: 0.85rem 1.4rem; text-decoration: none;
+  border: var(--edge) solid var(--ink);
+  box-shadow: var(--drop) var(--drop) 0 var(--ink);
+  background: var(--paper); color: var(--ink);
+  display: inline-block;
+  transition: transform 0.12s steps(2, end), box-shadow 0.12s steps(2, end);
+}
+.btn:hover { transform: translate(3px, 3px); box-shadow: 3px 3px 0 var(--ink); }
+.btn.fill { background: var(--sky); }
+
+.term { display: flex; align-items: center; gap: 0.8rem; padding: 0.85rem 1rem; margin-top: 2rem; max-width: 42rem; }
+.term code { flex: 1; min-width: 0; font-family: var(--mono); font-size: 0.84rem; overflow-x: auto; white-space: nowrap; scrollbar-width: none; }
+.term code::-webkit-scrollbar { display: none; }
+.term code::before { content: "$ "; color: var(--orange); font-weight: 700; }
+.cp {
+  font-family: var(--mono); font-weight: 700; font-size: 0.7rem; text-transform: uppercase;
+  cursor: pointer; background: var(--orange); color: var(--ink);
+  border: var(--edge) solid var(--ink); padding: 0.35rem 0.7rem; flex-shrink: 0;
+  transition: transform 0.12s steps(2, end);
+}
+.cp:hover { transform: translate(2px, 2px); }
+
+/* ── stat slab ─────────────────────────────────────────────────────────── */
+.slab { font-family: var(--display); font-weight: 800; letter-spacing: -0.05em; line-height: 0.86; font-size: clamp(3.5rem, 12vw, 8rem); }
+.slab.cost { color: var(--orange); }
+.slab-label { font-family: var(--mono); font-size: 0.72rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; }
+
+/* ── grid & cards ──────────────────────────────────────────────────────── */
+/* Grid and flex children default to min-width:auto, so a <pre> with long
+   lines refuses to shrink and drags the whole page wider than the viewport
+   instead of scrolling inside itself. This is the fix for that. */
+.grid { display: grid; gap: 1.4rem; }
+.grid > * { min-width: 0; }
+@media (min-width: 800px) { .grid.two { grid-template-columns: 1fr 1fr; align-items: start; } }
+.card { padding: 1.4rem; display: flex; flex-direction: column; gap: 0.6rem; }
+.card p { margin: 0; font-size: 0.92rem; }
+.card .use { font-family: var(--mono); font-weight: 700; font-size: 0.95rem; }
+.pill {
+  align-self: flex-start; font-family: var(--mono); font-weight: 700;
+  font-size: 0.62rem; letter-spacing: 0.14em; text-transform: uppercase;
+  border: 2px solid var(--ink); padding: 0.2rem 0.55rem;
+}
+.pill.win { background: var(--sky); }
+.pill.warn { background: var(--orange); }
+.on-ink .pill { border-color: var(--paper); color: var(--ink); }
+
+/* ── code ──────────────────────────────────────────────────────────────── */
+pre {
+  margin: 0; padding: 1.1rem;
+  background: var(--paper);
+  border: var(--edge) solid var(--ink);
+  overflow-x: auto;
+  font-family: var(--mono); font-size: 0.78rem; line-height: 1.6;
+}
+.panel-head {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 1rem;
+  font-family: var(--mono); font-size: 0.72rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.1em;
+  margin-bottom: 0.7rem;
+}
+.kw { color: var(--sky); }
+.st { color: var(--orange); }
+.cm { color: var(--grey); }
+.on-ink .cm { color: var(--grey-d); }
+/* the boxed look is for inline code in prose only — inside .term the box
+   already supplies the border, and two of them read as a bug. */
+p > code, li > code, td > code { font-family: var(--mono); font-size: 0.88em; border: 2px solid var(--ink); padding: 0 0.3em; }
+.on-ink p > code, .on-ink li > code, .on-ink td > code { border-color: var(--paper); }
+
+/* ── tables ────────────────────────────────────────────────────────────── */
+.scroller { overflow-x: auto; border: var(--edge) solid var(--ink); box-shadow: var(--drop) var(--drop) 0 var(--ink); }
+.on-ink .scroller { box-shadow: var(--drop) var(--drop) 0 var(--orange); }
+table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 0.85rem; font-variant-numeric: tabular-nums; min-width: 30rem; }
+th, td { padding: 0.8rem 1.1rem; text-align: left; white-space: nowrap; }
+th { font-weight: 700; font-size: 0.68rem; letter-spacing: 0.14em; text-transform: uppercase; border-bottom: var(--edge) solid var(--ink); }
+td { border-bottom: 2px solid rgba(11,11,11,0.14); }
+tr:last-child td { border-bottom: none; }
+td.n, th.n { text-align: right; }
+.up { color: var(--orange); font-weight: 700; }
+.dn { color: var(--sky); font-weight: 700; }
+.foot-note { font-family: var(--mono); font-size: 0.76rem; margin-top: 1rem; }
+
+/* ── quote ─────────────────────────────────────────────────────────────── */
+.quote {
+  font-family: var(--display); font-weight: 800;
+  font-size: clamp(1.7rem, 4.6vw, 3rem); line-height: 1.05; letter-spacing: -0.035em;
+  max-width: 20ch; margin: 0 0 1.6rem;
   text-transform: uppercase;
-  padding: 0.22rem 0.6rem;
-  border-radius: 999px;
-  border: 1px solid currentColor;
 }
-.tag.win { color: var(--accent); }
-.tag.warn { color: var(--brand); }
+.quote b { color: var(--orange); }
 
-/* ---------- callout ---------- */
-.callout {
-  padding: 1.1rem 1.3rem;
-  border-left: 3px solid var(--brand);
-  background: var(--surface);
-  border-radius: 0 12px 12px 0;
-  font-size: 0.92rem;
-}
+/* ── footer ────────────────────────────────────────────────────────────── */
+footer { padding-block: 3rem; font-family: var(--mono); font-size: 0.8rem; }
+.foot { display: flex; flex-wrap: wrap; gap: 1rem 2.5rem; justify-content: space-between; align-items: baseline; }
 
-footer { border-top: 1px solid var(--rule); padding-block: 3rem; }
-.foot { display: flex; flex-wrap: wrap; gap: 1rem 2rem; justify-content: space-between; align-items: baseline; }
-
-.reveal { opacity: 0; transform: translateY(18px); transition: opacity 0.7s ease, transform 0.7s ease; }
-.reveal.in { opacity: 1; transform: none; }
-
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
-.skip {
-  position: absolute; left: -9999px;
-  background: var(--accent); color: #fff;
-  padding: 0.6rem 1rem; border-radius: 0 0 8px 0; z-index: 50;
-}
+/* ── motion ────────────────────────────────────────────────────────────── */
+/* Visible by default: JS opts INTO the reveal by setting .js on <body>.
+   The other way round, a failed script leaves the whole page below the hero
+   invisible. */
+.rise { opacity: 1; }
+.js .rise { opacity: 0; transform: translateY(16px); transition: opacity 0.45s ease-out, transform 0.45s ease-out; }
+.js .rise.in { opacity: 1; transform: none; }
+:focus-visible { outline: var(--edge) solid var(--sky); outline-offset: 3px; }
+.skip { position: absolute; left: -9999px; background: var(--sky); color: var(--ink); padding: 0.6rem 1rem; border: var(--edge) solid var(--ink); z-index: 60; }
 .skip:focus { left: 0; top: 0; }
-
+.sr { position: absolute; left: -9999px; }
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation: none !important; transition: none !important; }
-  .reveal { opacity: 1; transform: none; }
+  html { scroll-behavior: auto; }
+  .js .rise, .js .rise.in { opacity: 1; transform: none; transition: none; }
+  .btn, .box, .cp { transition: none; }
 }
 </style>
 </head>
 <body>
-<div class="bloom" aria-hidden="true"></div>
 <a class="skip" href="#main">Skip to content</a>
 
 <header>
   <div class="wrap bar">
-    <a class="mark" href="#">cslim</a>
+    <a class="mark" href="#">cs<i>lim</i></a>
     <nav>
-      <a class="hide-sm" href="#what">What it does</a>
-      <a href="#benchmarks">Benchmarks</a>
-      <a class="hide-sm" href="#install">Install</a>
-      <a href="./drive/">Drive</a>
-      <a class="hide-sm" href="./story/">Story</a>
+      <a class="sm" href="#what">What</a>
+      <a href="#bench">Benchmarks</a>
+      <a class="sm" href="#install">Install</a>
+      <a class="md" href="./drive/">Drive</a>
+      <a class="md" href="./story/">Story</a>
       <a href="https://github.com/nexusstartup1-create/claudeslim">GitHub</a>
     </nav>
   </div>
@@ -527,159 +263,177 @@ footer { border-top: 1px solid var(--rule); padding-block: 3rem; }
 
 <main id="main">
 
-  <section class="hero" id="hero">
-    <canvas id="grid" aria-hidden="true"></canvas>
-    <div class="wrap hero-inner" data-px="-60" data-px-from="top">
-      <p class="eyebrow anim" style="--d:0ms">Context optimizer for Claude Code</p>
-      <h1 class="anim" style="--d:80ms">Token count is <span>not cost.</span></h1>
-      <p class="lede anim" style="--d:160ms">A context-window optimizer for Claude Code — and the benchmarks that say when not to use it.</p>
-      <div class="cta anim" style="--d:240ms">
-        <a class="btn btn-primary" href="https://github.com/nexusstartup1-create/claudeslim">View on GitHub</a>
-        <a class="btn btn-ghost" href="#benchmarks">Read the benchmarks</a>
+  <!-- 1 · PAPER -->
+  <section class="band hero">
+    <div class="wrap">
+      <span class="tag">Context optimizer · Claude Code</span>
+      <h1>Token count<br>is <em>not cost</em>.</h1>
+      <p class="lede">A context-window optimizer for Claude Code — and the benchmarks that say when not to use it.</p>
+      <div class="box term">
+        <code id="cmd">git clone https://github.com/nexusstartup1-create/claudeslim.git</code>
+        <button class="cp" id="cp" type="button">Copy</button>
+        <span class="sr" id="live" aria-live="polite"></span>
       </div>
-      <div class="glass terminal anim" style="--d:320ms;max-width:640px">
-        <div class="cmd" id="install-cmd">git clone https://github.com/nexusstartup1-create/claudeslim.git</div>
-        <button class="copy" id="copy-btn" type="button">Copy</button>
-        <span class="note" id="copy-live" aria-live="polite" style="position:absolute;left:-9999px"></span>
+      <div class="cta">
+        <a class="btn fill" href="https://github.com/nexusstartup1-create/claudeslim">View on GitHub</a>
+        <a class="btn" href="#bench">Read the benchmarks</a>
       </div>
-      <p class="hint anim" style="--d:420ms">Move your cursor. Click anywhere.</p>
     </div>
   </section>
 
-  <section id="what" class="reveal">
-    <div class="wrap stack">
-      <p class="eyebrow">What it does</p>
-      <h2>Keep the skeleton. Drop the body.</h2>
-      <p class="lede">A real AST parser reads your repo and keeps signatures, types, class hierarchies and imports. Every function body goes.</p>
-      <div class="compare" style="margin-top:1rem">
-        <div class="glass panel" data-px="34">
-          <div class="panel-label"><span>What Claude reads today</span><b>134 tokens</b></div>
-<pre><span class="k">def</span> copy_to_clipboard(text: str) -&gt; str:
-    <span class="c">"""Copy text to the clipboard; returns the backend."""</span>
-    <span class="k">for</span> name, command <span class="k">in</span> _candidate_backends():
-        <span class="k">if not</span> shutil.which(command[<span class="s">0</span>]):
-            <span class="k">continue</span>
-        <span class="k">try</span>:
-            subprocess.run(command, input=text.encode(<span class="s">"utf-8"</span>))
-            <span class="k">return</span> name
-        <span class="k">except</span> (subprocess.CalledProcessError, OSError):
-            <span class="k">continue</span>
-    <span class="k">try</span>:
-        <span class="k">import</span> pyperclip
+  <!-- 2 · INK -->
+  <section class="band on-ink rise" id="what">
+    <div class="wrap">
+      <span class="tag">What it does</span>
+      <h2>Keep the skeleton.<br>Drop the body.</h2>
+      <p class="muted" style="margin-bottom:2.5rem">A real AST parser keeps signatures, types, class hierarchies and imports. Every function body goes.</p>
+
+      <div class="grid two">
+        <div>
+          <div class="panel-head"><span>Claude reads today</span><span class="o">134 tokens</span></div>
+<pre><span class="kw">def</span> copy_to_clipboard(text: str) -&gt; str:
+    <span class="cm">"""Copy text to the clipboard; returns the backend."""</span>
+    <span class="kw">for</span> name, command <span class="kw">in</span> _candidate_backends():
+        <span class="kw">if not</span> shutil.which(command[<span class="st">0</span>]):
+            <span class="kw">continue</span>
+        <span class="kw">try</span>:
+            subprocess.run(command, input=text.encode(<span class="st">"utf-8"</span>))
+            <span class="kw">return</span> name
+        <span class="kw">except</span> (subprocess.CalledProcessError, OSError):
+            <span class="kw">continue</span>
+    <span class="kw">try</span>:
+        <span class="kw">import</span> pyperclip
         pyperclip.copy(text)
-        <span class="k">return</span> <span class="s">"pyperclip"</span>
-    <span class="k">except</span> Exception <span class="k">as</span> exc:
-        <span class="k">raise</span> ClipboardError(<span class="s">"no backend ..."</span>) <span class="k">from</span> exc</pre>
+        <span class="kw">return</span> <span class="st">"pyperclip"</span>
+    <span class="kw">except</span> Exception <span class="kw">as</span> exc:
+        <span class="kw">raise</span> ClipboardError(<span class="st">"no backend ..."</span>) <span class="kw">from</span> exc</pre>
         </div>
-        <div class="glass panel" data-px="-26">
-          <div class="panel-label win"><span>What Claude reads with cslim</span><b>35 tokens</b></div>
-<pre><span class="k">def</span> copy_to_clipboard(text: str) -&gt; str:
-    <span class="c">"""Copy ``text`` to the clipboard; returns the backend."""</span>
-    <span class="d">...</span></pre>
-          <p class="note" style="margin-top:0.9rem">The name survives. The types survive. The promise survives. Only the <em>how</em> disappears.</p>
+        <div>
+          <div class="panel-head"><span>Claude reads with cslim</span><span class="s">35 tokens</span></div>
+<pre><span class="kw">def</span> copy_to_clipboard(text: str) -&gt; str:
+    <span class="cm">"""Copy ``text`` to the clipboard; returns the backend."""</span>
+    ...</pre>
+          <p class="muted" style="margin-top:1.2rem;font-size:0.92rem">The name survives. The types survive. The promise survives. Only the <em>how</em> disappears.</p>
         </div>
       </div>
     </div>
   </section>
 
-  <section id="benchmarks" class="invert">
-    <div class="wrap stack">
-      <p class="eyebrow" data-px="26">The finding</p>
-      <h2 data-px="16">I benchmarked it. It cost more.</h2>
-      <p class="lede">Every configuration of the automatic map cost more than sending nothing. Real Claude Code sessions, reading Anthropic's own <code>total_cost_usd</code> out of <code>claude -p --output-format json</code>. Nothing estimated.</p>
-      <div class="scroller" data-px="-18" style="margin-top:0.5rem">
-        <table>
-          <caption class="note" style="text-align:left;padding:0.8rem 1rem 0">pallets/flask — 80 files, 12 turns, 3 sessions per arm</caption>
-          <thead><tr><th>Map</th><th class="num">Cost / session</th><th class="num">vs control</th></tr></thead>
-          <tbody>
-            <tr><td>none</td><td class="num">$0.7814</td><td class="num">—</td></tr>
-            <tr><td>full AST map</td><td class="num">$0.9729</td><td class="num cost">+24.5%</td></tr>
-            <tr><td>index only</td><td class="num">$0.9213</td><td class="num cost">+17.9%</td></tr>
-          </tbody>
-        </table>
+  <!-- 3 · PAPER -->
+  <section class="band rise" id="bench">
+    <div class="wrap">
+      <span class="tag">The finding</span>
+      <h2>I benchmarked it.<br>It cost more.</h2>
+      <p style="margin-bottom:2.5rem">Every configuration of the automatic map cost more than sending nothing. Real Claude Code sessions, reading Anthropic's own <code>total_cost_usd</code>. Nothing estimated.</p>
+
+      <div style="display:flex;flex-wrap:wrap;gap:2.5rem 4rem;margin-bottom:2.5rem">
+        <div>
+          <div class="slab cost">+24.5%</div>
+          <div class="slab-label muted">full AST map</div>
+        </div>
+        <div>
+          <div class="slab cost">+17.9%</div>
+          <div class="slab-label muted">index only</div>
+        </div>
       </div>
-      <p class="note">Control spread ±$0.0820 — both gaps clear the noise.</p>
-    </div>
-  </section>
 
-  <section class="reveal">
-    <div class="wrap stack">
-      <p class="eyebrow">Why</p>
-      <h2>The caching math</h2>
-      <p class="quote" data-px="20">One token of freshly injected context costs roughly what <b>twelve cache-read tokens</b> cost.</p>
-      <p>Anthropic bills a cache write at ~1.25× base input and a cache read at ~0.1×. Claude Code's exploration is almost entirely cache reads — re-reading a file it already pulled is nearly free. A map has to prevent ~12× its own size in exploration just to break even.</p>
-
-      <h3 style="margin-top:1.5rem">Shrinking the map doesn't help</h3>
       <div class="scroller">
         <table>
-          <thead><tr><th>Injected</th><th class="num">Extra cache write</th></tr></thead>
+          <caption class="sr">Cost per session on pallets/flask</caption>
+          <thead><tr><th>Map</th><th class="n">Cost / session</th><th class="n">vs control</th></tr></thead>
           <tbody>
-            <tr><td>500 tokens</td><td class="num cost">+7,014</td></tr>
-            <tr><td>5,000 tokens</td><td class="num cost">+17,384</td></tr>
-            <tr><td>30,000 tokens</td><td class="num cost">+16,734</td></tr>
+            <tr><td>none</td><td class="n">$0.7814</td><td class="n">—</td></tr>
+            <tr><td>full AST map</td><td class="n">$0.9729</td><td class="n up">+24.5%</td></tr>
+            <tr><td>index only</td><td class="n">$0.9213</td><td class="n up">+17.9%</td></tr>
           </tbody>
         </table>
       </div>
-      <p class="note">5k and 30k are statistically indistinguishable. Cost is driven by the <em>act</em> of injecting, not by size.</p>
-
-      <h3 style="margin-top:1.5rem">But where you put it does</h3>
-      <div class="scroller">
-        <table>
-          <caption class="note" style="text-align:left;padding:0.8rem 1rem 0">Identical 5,026-token payload — only the mechanism varies</caption>
-          <thead><tr><th>Delivery</th><th class="num">Cost / session</th><th class="num">vs control</th></tr></thead>
-          <tbody>
-            <tr><td>nothing</td><td class="num">$0.0843</td><td class="num">—</td></tr>
-            <tr><td>UserPromptSubmit hook</td><td class="num">$0.2328</td><td class="num cost">+176%</td></tr>
-            <tr><td>CLAUDE.md</td><td class="num">$0.1147</td><td class="num cost">+36%</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p class="note">6.9× the run-to-run spread. Same content, same model — five times the price depending on which door you push it through. The overhead isn't inherent to giving Claude a map; it's specific to the mechanism.</p>
+      <p class="foot-note muted">pallets/flask · 80 files · 12 turns · 3 sessions per arm · control spread ±$0.0820 — both gaps clear the noise.</p>
     </div>
   </section>
 
-  <section class="reveal">
-    <div class="wrap stack">
-      <p class="eyebrow">Which mode to use</p>
-      <h2>Two of these are unambiguous wins.</h2>
-      <div class="modes" style="margin-top:1rem">
-        <div class="glass mode">
-          <span class="tag win">Measured win</span>
+  <!-- 4 · INK -->
+  <section class="band on-ink rise">
+    <div class="wrap">
+      <span class="tag blue">Why</span>
+      <p class="quote">One injected token costs what <b>twelve cache-read tokens</b> cost.</p>
+      <p class="muted">Anthropic bills a cache write at ~1.25× base input and a cache read at ~0.1×. Claude Code's exploration is almost entirely cache reads — re-reading a file it already pulled is nearly free. A map has to prevent ~12× its own size in exploration just to break even.</p>
+
+      <h3 style="margin:3rem 0 1rem;font-size:1.3rem">Shrinking the map doesn't help</h3>
+      <div class="scroller">
+        <table>
+          <thead><tr><th>Injected</th><th class="n">Extra cache write</th></tr></thead>
+          <tbody>
+            <tr><td>500 tokens</td><td class="n up">+7,014</td></tr>
+            <tr><td>5,000 tokens</td><td class="n up">+17,384</td></tr>
+            <tr><td>30,000 tokens</td><td class="n up">+16,734</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="foot-note muted">5k and 30k are statistically indistinguishable. Cost is driven by the <em>act</em> of injecting, not by size.</p>
+
+      <h3 style="margin:3rem 0 1rem;font-size:1.3rem">But where you put it does</h3>
+      <div class="scroller">
+        <table>
+          <caption class="sr">Identical payload, different delivery</caption>
+          <thead><tr><th>Delivery</th><th class="n">Cost / session</th><th class="n">vs control</th></tr></thead>
+          <tbody>
+            <tr><td>nothing</td><td class="n">$0.0843</td><td class="n">—</td></tr>
+            <tr><td>UserPromptSubmit hook</td><td class="n">$0.2328</td><td class="n up">+176%</td></tr>
+            <tr><td>CLAUDE.md</td><td class="n">$0.1147</td><td class="n up">+36%</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="foot-note muted">Identical 5,026-token payload · 6.9× the run-to-run spread. Same content, five times the price depending on which door you push it through.</p>
+    </div>
+  </section>
+
+  <!-- 5 · PAPER -->
+  <section class="band rise">
+    <div class="wrap">
+      <span class="tag blue">Which mode</span>
+      <h2>Two of these<br>are real wins.</h2>
+      <div class="grid two" style="margin-top:2.5rem">
+        <div class="box card press">
+          <span class="pill win">Measured win</span>
           <h3>Reviewing a diff</h3>
           <p class="use">cslim diff</p>
-          <p class="note">Strips blob hashes, lockfile churn and whitespace-only reformatting. Pure subtraction — nothing injected. <strong class="good">−57%</strong></p>
+          <p class="muted">Strips blob hashes, lockfile churn and whitespace-only reformatting. Pure subtraction — nothing injected. <strong class="s">−57%</strong></p>
         </div>
-        <div class="glass mode">
-          <span class="tag win">Measured win</span>
+        <div class="box card press">
+          <span class="pill win">Measured win</span>
           <h3>Debugging test or CI output</h3>
           <p class="use">cslim clean</p>
-          <p class="note">ANSI codes stripped, progress bars collapsed to their final state, repeated lines counted. <strong class="good">−60%</strong></p>
+          <p class="muted">ANSI codes stripped, progress bars collapsed to their final state, repeated lines counted. <strong class="s">−60%</strong></p>
         </div>
-        <div class="glass mode">
-          <span class="tag warn">Buys coverage, costs money</span>
-          <h3>Repo doesn't fit the context window</h3>
+        <div class="box card press">
+          <span class="pill warn">Costs money</span>
+          <h3>Repo won't fit the context window</h3>
           <p class="use">cslim --index-only</p>
-          <p class="note">Measured to fit: a 25-file project reaches 1k tokens. It will still raise your bill.</p>
+          <p class="muted">Measured to fit: a 25-file project reaches 1k tokens. It will still raise your bill.</p>
         </div>
-        <div class="glass mode">
-          <span class="tag warn">Hypothesis falsified</span>
-          <h3>You want to spend less money</h3>
+        <div class="box card press">
+          <span class="pill warn">Falsified</span>
+          <h3>You want to spend less</h3>
           <p class="use">no map</p>
-          <p class="note">No map configuration beat the control. 12-turn sessions showed the same penalty as 2-turn ones.</p>
+          <p class="muted">No map configuration beat the control. 12-turn sessions showed the same penalty as 2-turn ones.</p>
         </div>
       </div>
     </div>
   </section>
 
-  <section id="install" class="reveal">
-    <div class="wrap stack">
-      <p class="eyebrow">Install</p>
-      <h2>Python 3.10+ and git.</h2>
-<pre style="max-width:640px">git clone https://github.com/nexusstartup1-create/claudeslim.git
+  <!-- 6 · INK -->
+  <section class="band on-ink rise" id="install">
+    <div class="wrap">
+      <span class="tag">Install</span>
+      <h2>Python 3.10+<br>and git.</h2>
+<pre style="max-width:44rem">git clone https://github.com/nexusstartup1-create/claudeslim.git
 cd claudeslim
 uv tool install --editable . --with textual</pre>
-      <div class="callout" style="max-width:var(--measure)">
-        The distribution is <code>cslim</code>. <code>claudeslim</code> on PyPI is a different, unrelated project — don't install that one by mistake. Not yet published; install from source.
+      <p class="muted" style="margin-top:1.4rem">The distribution is <code>cslim</code>. <code>claudeslim</code> on PyPI is a different, unrelated project — don't install that one by mistake. Not yet published; install from source.</p>
+      <div class="cta">
+        <a class="btn fill" href="https://github.com/nexusstartup1-create/claudeslim">Get cslim</a>
+        <a class="btn" href="./drive/">Take the drive</a>
       </div>
     </div>
   </section>
@@ -688,291 +442,34 @@ uv tool install --editable . --with textual</pre>
 
 <footer>
   <div class="wrap foot">
-    <p class="note" style="max-width:44ch"><a href="./drive/">Take the drive</a> · <a href="./story/">Who built this</a><br>Run the benchmarks on your own repository — results that contradict these are the most useful contribution right now.</p>
-    <p class="note">
-      MIT ·
-      <a href="https://github.com/nexusstartup1-create/claudeslim">GitHub</a> ·
-      <a href="https://github.com/nexusstartup1-create/claudeslim/blob/main/bench/README.md">Method</a>
-    </p>
+    <span class="muted" style="max-width:42ch">Run the benchmarks on your own repository — results that contradict these are the most useful contribution right now.</span>
+    <span>MIT · <a href="https://github.com/nexusstartup1-create/claudeslim">GitHub</a> · <a href="https://github.com/nexusstartup1-create/claudeslim/blob/main/bench/README.md">Method</a> · <a href="./story/">Alberto Galli</a></span>
   </div>
 </footer>
 
 <script>
 (function () {
-  var btn = document.getElementById("copy-btn");
-  var cmd = document.getElementById("install-cmd");
-  var live = document.getElementById("copy-live");
-  if (btn && cmd) {
-    btn.addEventListener("click", function () {
-      var text = cmd.textContent.trim();
-      var done = function () {
-        btn.textContent = "Copied";
-        if (live) { live.textContent = "Install command copied to clipboard"; }
-        setTimeout(function () { btn.textContent = "Copy"; }, 2000);
-      };
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text).then(done, done);
-      } else { done(); }
-    });
-  }
+  var b = document.getElementById("cp"), c = document.getElementById("cmd"), live = document.getElementById("live");
+  if (b && c) b.addEventListener("click", function () {
+    var done = function () {
+      b.textContent = "Copied";
+      if (live) live.textContent = "Command copied to clipboard";
+      setTimeout(function () { b.textContent = "Copy"; }, 1800);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(c.textContent.trim()).then(done, done);
+    else done();
+  });
 
-  var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  var targets = document.querySelectorAll(".reveal");
-  if (reduce || !("IntersectionObserver" in window)) {
-    targets.forEach(function (el) { el.classList.add("in"); });
+  var items = document.querySelectorAll(".rise");
+  document.body.classList.add("js");
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches || !("IntersectionObserver" in window)) {
+    for (var i = 0; i < items.length; i++) items[i].classList.add("in");
     return;
   }
-  var io = new IntersectionObserver(function (entries) {
-    entries.forEach(function (e) {
-      if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); }
-    });
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } });
   }, { rootMargin: "0px 0px -12% 0px" });
-  targets.forEach(function (el) { io.observe(el); });
-})();
-
-/* ── Kinetic grid ──────────────────────────────────────────────────────────
-   Ported from the React KineticGrid to plain canvas. Three changes from the
-   original: it scales for devicePixelRatio so the lines stay crisp, it only
-   runs while the hero is on screen (an off-screen rAF loop burns battery for
-   nothing), and reduced-motion gets a single static frame instead of the loop.
-*/
-(function () {
-  var canvas = document.getElementById("grid");
-  if (!canvas || !canvas.getContext) return;
-  var ctx = canvas.getContext("2d");
-  var hero = document.getElementById("hero");
-
-  var CELL = 55, INFLUENCE = 260, MAX_WARP = 24, DOT = 28, LERP = 0.08;
-  var LINE_BASE = { r: 255, g: 255, b: 255, a: 0.13 };
-  var NODE_MIN = 1.8, NODE_MAX = 3.2;
-  var THEME = {
-    bg: "#0e1014",
-    line: { r: 46, g: 139, b: 255, a: 0.9 },   // site blue
-    node: { r: 124, g: 196, b: 255, a: 1.0 },
-    glow: "46,139,255",
-    ripple: "255,122,26"                        // site orange
-  };
-
-  var mouse = { x: -9999, y: -9999 }, target = { x: -9999, y: -9999 };
-  var ripples = [], raf = 0, W = 0, H = 0, running = false;
-  var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-  function lerp(a, b, t) { return a + (b - a) * t; }
-  function mix(base, active, t) {
-    return "rgba(" + Math.round(lerp(base.r, active.r, t)) + "," +
-      Math.round(lerp(base.g, active.g, t)) + "," +
-      Math.round(lerp(base.b, active.b, t)) + "," +
-      lerp(base.a, active.a, t).toFixed(3) + ")";
-  }
-
-  function resize() {
-    var rect = hero.getBoundingClientRect();
-    var dpr = Math.min(window.devicePixelRatio || 1, 2);
-    W = Math.max(1, rect.width);
-    H = Math.max(1, rect.height);
-    canvas.width = Math.round(W * dpr);
-    canvas.height = Math.round(H * dpr);
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  }
-
-  function warp(gx, gy, col, row, cols, rows) {
-    var margin = 1.5;
-    var cp = Math.min(col / margin, (cols - 1 - col) / margin, 1);
-    var rp = Math.min(row / margin, (rows - 1 - row) / margin, 1);
-    var pin = cp * cp * rp * rp;
-
-    var dx = gx - mouse.x, dy = gy - mouse.y;
-    var dist = Math.sqrt(dx * dx + dy * dy);
-    var prox = Math.max(0, 1 - dist / INFLUENCE) * pin;
-
-    var rx = 0, ry = 0;
-    for (var i = 0; i < ripples.length; i++) {
-      var r = ripples[i];
-      var rdx = gx - r.x, rdy = gy - r.y;
-      var rdist = Math.sqrt(rdx * rdx + rdy * rdy);
-      var diff = rdist - r.radius;
-      if (Math.abs(diff) < 55) {
-        var st = (1 - Math.abs(diff) / 55) * r.opacity * 18 * pin;
-        var ang = Math.atan2(rdy, rdx);
-        var sign = diff < 0 ? -1 : 1;
-        rx += Math.cos(ang) * st * sign * -1;
-        ry += Math.sin(ang) * st * sign * -1;
-      }
-    }
-
-    if (dist < INFLUENCE && dist > 0 && pin > 0) {
-      var t = dist / INFLUENCE;
-      var eased = t < 0.01 ? 0 : (1 - t) * (1 - t) * Math.min(1, dist / 60);
-      var amt = eased * MAX_WARP * pin;
-      var a = Math.atan2(dy, dx);
-      return { x: gx - Math.cos(a) * amt + rx, y: gy - Math.sin(a) * amt + ry, p: prox };
-    }
-    return { x: gx + rx, y: gy + ry, p: prox };
-  }
-
-  function draw(now) {
-    ctx.clearRect(0, 0, W, H);
-    ctx.fillStyle = THEME.bg;
-    ctx.fillRect(0, 0, W, H);
-
-    ctx.fillStyle = "rgba(255,255,255,0.05)";
-    for (var x = DOT / 2; x < W; x += DOT) {
-      for (var y = DOT / 2; y < H; y += DOT) {
-        ctx.beginPath(); ctx.arc(x, y, 0.7, 0, Math.PI * 2); ctx.fill();
-      }
-    }
-
-    for (var i = ripples.length - 1; i >= 0; i--) {
-      var age = (now - ripples[i].born) / 1000;
-      ripples[i].radius = Math.max(0, age * 400);
-      ripples[i].opacity = Math.max(0, 1 - age * 1.2);
-      if (ripples[i].opacity <= 0) ripples.splice(i, 1);
-    }
-
-    var cols = Math.max(2, Math.ceil(W / CELL)) + 1;
-    var rows = Math.max(2, Math.ceil(H / CELL)) + 1;
-    var cw = W / (cols - 1), ch = H / (rows - 1);
-    var pts = [], row, col;
-
-    for (row = 0; row < rows; row++) {
-      pts[row] = [];
-      for (col = 0; col < cols; col++) pts[row][col] = warp(col * cw, row * ch, col, row, cols, rows);
-    }
-
-    function seg(a, b) {
-      var avg = (a.p + b.p) / 2;
-      var t = avg * avg * (3 - 2 * avg);
-      ctx.beginPath();
-      ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
-      ctx.strokeStyle = mix(LINE_BASE, THEME.line, t);
-      ctx.lineWidth = lerp(0.8, 1.5, t);
-      ctx.stroke();
-    }
-    for (row = 0; row < rows; row++)
-      for (col = 0; col < cols - 1; col++) seg(pts[row][col], pts[row][col + 1]);
-    for (col = 0; col < cols; col++)
-      for (row = 0; row < rows - 1; row++) seg(pts[row][col], pts[row + 1][col]);
-
-    for (row = 0; row < rows; row++) {
-      for (col = 0; col < cols; col++) {
-        var pt = pts[row][col];
-        var t2 = pt.p * pt.p * (3 - 2 * pt.p);
-        var rad = lerp(NODE_MIN, NODE_MAX, t2);
-        if (t2 > 0.3) {
-          var gr = rad + lerp(0, 6, (t2 - 0.3) / 0.7);
-          var grd = ctx.createRadialGradient(pt.x, pt.y, rad * 0.5, pt.x, pt.y, gr);
-          grd.addColorStop(0, "rgba(" + THEME.glow + "," + (t2 * 0.3).toFixed(3) + ")");
-          grd.addColorStop(1, "rgba(" + THEME.glow + ",0)");
-          ctx.beginPath(); ctx.arc(pt.x, pt.y, gr, 0, Math.PI * 2);
-          ctx.fillStyle = grd; ctx.fill();
-        }
-        ctx.beginPath(); ctx.arc(pt.x, pt.y, rad, 0, Math.PI * 2);
-        ctx.fillStyle = mix({ r: 255, g: 255, b: 255, a: 0.2 }, THEME.node, t2);
-        ctx.fill();
-      }
-    }
-
-    for (var k = 0; k < ripples.length; k++) {
-      ctx.beginPath();
-      ctx.arc(ripples[k].x, ripples[k].y, Math.max(0, ripples[k].radius), 0, Math.PI * 2);
-      ctx.strokeStyle = "rgba(" + THEME.ripple + "," + (ripples[k].opacity * 0.3).toFixed(3) + ")";
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-    }
-  }
-
-  function frame(now) {
-    mouse.x = lerp(mouse.x, target.x, LERP);
-    mouse.y = lerp(mouse.y, target.y, LERP);
-    draw(now);
-    raf = requestAnimationFrame(frame);
-  }
-  function start() { if (!running && !reduce) { running = true; raf = requestAnimationFrame(frame); } }
-  function stop() { if (running) { running = false; cancelAnimationFrame(raf); } }
-
-  resize();
-  window.addEventListener("resize", function () { resize(); if (!running) draw(performance.now()); });
-
-  if (reduce) { draw(performance.now()); return; }
-
-  hero.addEventListener("mousemove", function (e) {
-    var r = hero.getBoundingClientRect();
-    target.x = e.clientX - r.left; target.y = e.clientY - r.top;
-  });
-  hero.addEventListener("mouseleave", function () { target.x = -9999; target.y = -9999; });
-  hero.addEventListener("click", function (e) {
-    var r = hero.getBoundingClientRect();
-    ripples.push({ x: e.clientX - r.left, y: e.clientY - r.top, radius: 0, opacity: 1, born: performance.now() });
-  });
-
-  if ("IntersectionObserver" in window) {
-    new IntersectionObserver(function (en) {
-      en[0].isIntersecting ? start() : stop();
-    }, { threshold: 0 }).observe(hero);
-  } else { start(); }
-})();
-
-/* page-load stagger */
-document.body.classList.add("js");
-requestAnimationFrame(function () { document.body.classList.add("loaded"); });
-
-/* header flips from dark-hero mode to glass once you scroll past the hero */
-(function () {
-  var head = document.querySelector("header");
-  var hero = document.getElementById("hero");
-  if (!head || !hero || !("IntersectionObserver" in window)) return;
-  new IntersectionObserver(function (en) {
-    head.classList.toggle("over-hero", en[0].isIntersecting);
-  }, { rootMargin: "-70px 0px 0px 0px" }).observe(hero);
-})();
-
-/* ── Scroll parallax ───────────────────────────────────────────────────────
-   The GSAP/Lenis original is replaced by ~30 lines: one rAF-throttled scroll
-   pass writing translate3d, which the compositor handles without layout. No
-   smooth-scroll hijack — native scrolling is left alone, and anchors use CSS
-   scroll-behavior instead.
-
-   Depth encodes meaning here rather than decorating: in the before/after pair
-   the 134-token panel lags behind and the 35-token one floats ahead, so the
-   weight difference is something you feel while scrolling.
-*/
-(function () {
-  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  var layers = Array.prototype.slice.call(document.querySelectorAll("[data-px]"));
-  if (!layers.length) return;
-
-  var ticking = false, vh = window.innerHeight;
-
-  function apply() {
-    ticking = false;
-    for (var i = 0; i < layers.length; i++) {
-      var el = layers[i];
-      var speed = parseFloat(el.getAttribute("data-px")) || 0;
-      var rect = el.getBoundingClientRect();
-
-      // skip anything comfortably off screen
-      if (rect.bottom < -vh * 0.5 || rect.top > vh * 1.5) continue;
-
-      var progress;
-      if (el.getAttribute("data-px-from") === "top") {
-        // hero: 0 at rest, 1 once scrolled a full viewport away
-        progress = Math.min(1, Math.max(0, -rect.top / vh));
-      } else {
-        // element centre relative to viewport centre, normalised to -1..1
-        progress = ((rect.top + rect.height / 2) - vh / 2) / vh;
-        progress = Math.max(-1.2, Math.min(1.2, progress));
-      }
-      el.style.transform = "translate3d(0," + (progress * speed).toFixed(2) + "px,0)";
-    }
-  }
-
-  function onScroll() {
-    if (!ticking) { ticking = true; requestAnimationFrame(apply); }
-  }
-
-  window.addEventListener("scroll", onScroll, { passive: true });
-  window.addEventListener("resize", function () { vh = window.innerHeight; onScroll(); });
-  apply();
+  for (var j = 0; j < items.length; j++) io.observe(items[j]);
 })();
 </script>
 </body>
