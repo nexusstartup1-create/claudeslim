@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "cslim"
 version = "0.1.0"
-description = "AST-based codebase & git-diff compressor that slashes token usage for Claude Code."
+description = "Context-window optimizer for Claude Code: strips noise from diffs and test output, and maps a codebase from its AST."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
@@ -56,6 +56,21 @@ Issues = "https://github.com/nexusstartup1-create/claudeslim/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["cslim"]
+
+[tool.hatch.build.targets.sdist]
+# The corpus is real source from node, vue, jquery, vscode, axios, zod, the Go
+# standard library, hugo and cobra. It belongs in the repository as test input,
+# under SOURCES.md — redistributing it inside our own artifact would pull in
+# three other licences and their notice obligations for no benefit. The corpus
+# test skips when it is absent, and tests/fetch_corpus.sh restores it.
+exclude = [
+  "tests/fixtures/corpus/*.js",
+  "tests/fixtures/corpus/*.ts",
+  "tests/fixtures/corpus/*.go",
+  "docs/",
+  "cslim-site/",
+  "*.rar",
+]
 
 [tool.ruff]
 line-length = 100
