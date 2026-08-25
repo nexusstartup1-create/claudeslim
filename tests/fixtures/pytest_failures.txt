@@ -1,0 +1,105 @@
+FFFF.F                                                                   [100%]
+=================================== FAILURES ===================================
+_____________________________ test_total_with_tax ______________________________
+
+    def test_total_with_tax():
+>       assert total([10, 20, 30], tax=0.1) == 70.0
+E       assert 66.0 == 70.0
+E        +  where 66.0 = total([10, 20, 30], tax=0.1)
+
+test_cart.py:13: AssertionError
+___________________________ test_recursion_blows_up ____________________________
+
+    def test_recursion_blows_up():
+>       deep(6)
+
+test_cart.py:16: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+test_cart.py:7: in deep
+    return deep(n - 1)
+           ^^^^^^^^^^^
+test_cart.py:7: in deep
+    return deep(n - 1)
+           ^^^^^^^^^^^
+test_cart.py:7: in deep
+    return deep(n - 1)
+           ^^^^^^^^^^^
+test_cart.py:7: in deep
+    return deep(n - 1)
+           ^^^^^^^^^^^
+test_cart.py:7: in deep
+    return deep(n - 1)
+           ^^^^^^^^^^^
+test_cart.py:7: in deep
+    return deep(n - 1)
+           ^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+n = 0
+
+    def deep(n):
+        if n == 0:
+>           raise ValueError("bottom reached")
+E           ValueError: bottom reached
+
+test_cart.py:6: ValueError
+____________________________ test_json_from_library ____________________________
+
+    def test_json_from_library():
+>       json.loads("{not json}")
+
+test_cart.py:19: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/Users/albertogalli/.local/share/uv/python/cpython-3.14.6-macos-aarch64-none/lib/python3.14/json/__init__.py:352: in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+/Users/albertogalli/.local/share/uv/python/cpython-3.14.6-macos-aarch64-none/lib/python3.14/json/decoder.py:345: in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <json.decoder.JSONDecoder object at 0x1089d3cb0>, s = '{not json}'
+idx = 0
+
+    def raw_decode(self, s, idx=0):
+        """Decode a JSON document from ``s`` (a ``str`` beginning with
+        a JSON document) and return a 2-tuple of the Python
+        representation and the index in ``s`` where the document ended.
+    
+        This can be used to decode a JSON document from a string that may
+        have extraneous data at the end.
+    
+        """
+        try:
+>           obj, end = self.scan_once(s, idx)
+                       ^^^^^^^^^^^^^^^^^^^^^^
+E           json.decoder.JSONDecodeError: Expecting property name enclosed in double quotes: line 1 column 2 (char 1)
+
+/Users/albertogalli/.local/share/uv/python/cpython-3.14.6-macos-aarch64-none/lib/python3.14/json/decoder.py:361: JSONDecodeError
+________________________________ test_param[1] _________________________________
+
+v = 1
+
+    @pytest.mark.parametrize("v", [1, 2, 3])
+    def test_param(v):
+>       assert v % 2 == 0
+E       assert (1 % 2) == 0
+
+test_cart.py:23: AssertionError
+________________________________ test_param[3] _________________________________
+
+v = 3
+
+    @pytest.mark.parametrize("v", [1, 2, 3])
+    def test_param(v):
+>       assert v % 2 == 0
+E       assert (3 % 2) == 0
+
+test_cart.py:23: AssertionError
+=========================== short test summary info ============================
+FAILED test_cart.py::test_total_with_tax - assert 66.0 == 70.0
+FAILED test_cart.py::test_recursion_blows_up - ValueError: bottom reached
+FAILED test_cart.py::test_json_from_library - json.decoder.JSONDecodeError: E...
+FAILED test_cart.py::test_param[1] - assert (1 % 2) == 0
+FAILED test_cart.py::test_param[3] - assert (3 % 2) == 0
+5 failed, 1 passed in 0.02s

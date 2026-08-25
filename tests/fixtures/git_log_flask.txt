@@ -1,0 +1,253 @@
+commit d318b683471101618febed18996405ad26462110
+Author: David Lord <davidism@gmail.com>
+Date:   2026-08-16 11:35:31 -0700
+
+    explain seek
+
+commit 2a8a38b051fc248865730bf3511bf2e2ea325e81
+Author: David Lord <davidism@gmail.com>
+Date:   2026-08-11 15:32:49 -0700
+
+    support query in methodview
+
+commit d8eaaba824655046958d1a97f11780de460c3271
+Merge: 3596b1a 8999295
+Author: David Lord <davidism@gmail.com>
+Date:   2026-08-11 13:19:14 -0700
+
+    add `app.query` route decorator (#6133)
+
+commit 89992954ec71b594b1b911f98977cdc8ad46a057
+Author: David Lord <davidism@gmail.com>
+Date:   2026-08-11 13:15:18 -0700
+
+    add app.query route decorator
+
+commit 3596b1ab61cea85edb8970e83ff61daa073facf8
+Author: David Lord <davidism@gmail.com>
+Date:   2026-08-11 12:56:09 -0700
+
+    add entry
+
+commit 05e9c6bd630ecf4ec0ec884b1fc7901663737bc7
+Merge: 514fc6b 7203fea
+Author: David Lord <davidism@gmail.com>
+Date:   2026-08-11 12:48:40 -0700
+
+    Fix `.partition(":")` usage on potential IPv6 addresses (#6096)
+
+commit 7203feabf723edae0286ae5dc64fec8ac4c91735
+Author: lkk7 <lukaszlapinski7@gmail.com>
+Date:   2026-07-14 16:42:09 +0200
+
+    Fix IPv6 server name parsing
+
+commit de8429ffda8cfb54db175529e2bae72a24e1fa7e
+Author: lkk7 <lukaszlapinski7@gmail.com>
+Date:   2026-07-14 16:40:58 +0200
+
+    Fix IPv6 session transactions
+
+commit 514fc6b3e8402e4c646d5284e97a4f0ab50a7c4b
+Merge: 8b4fd5d 81798b4
+Author: David Lord <davidism@gmail.com>
+Date:   2026-08-11 12:43:58 -0700
+
+    Merge branch 'stable'
+
+commit 81798b406f97ffe4795d2c9fc18db7db744a96dc
+Author: David Lord <davidism@gmail.com>
+Date:   2026-08-11 11:59:41 -0700
+
+    fix typos
+
+commit 8b4fd5d18611e63080b826ecfefe8659dba7d2e4
+Author: David Lord <davidism@gmail.com>
+Date:   2026-08-10 16:45:01 -0700
+
+    use header properties
+
+commit 6a2f545bfd8ed31e19066a299296917e034aca58
+Merge: 36e4a82 30d1c5d
+Author: David Lord <davidism@gmail.com>
+Date:   2026-07-30 10:29:33 -0700
+
+    Merge branch 'stable'
+
+commit 30d1c5d6fcbd62d9e902209d7a207f7510e9f5dc
+Author: David Lord <davidism@gmail.com>
+Date:   2026-07-30 10:27:54 -0700
+
+    test Python 3.15
+
+commit ff6fa22f4d961a28567db11430208b964620f511
+Author: David Lord <davidism@gmail.com>
+Date:   2026-07-30 10:25:54 -0700
+
+    update dependencies
+
+commit 548994ea0c61465574cbfdd636a894a692f54b94
+Merge: 8285adf 5ce121d
+Author: David Lord <davidism@gmail.com>
+Date:   2026-07-30 10:05:04 -0700
+
+    Replace the use of private `monkeypatch` fixture API (#6095)
+
+commit 5ce121dd841e2dc2594d0ed3954278f4101d3521
+Author: Michał Górny <mgorny@gentoo.org>
+Date:   2026-07-14 12:07:37 +0200
+
+    Replace the use of private `monkeypatch` fixture API
+
+commit 8285adf5a4f572dbf7a0a3b8f3a96ca0b19c50a4
+Author: David Lord <davidism@gmail.com>
+Date:   2026-06-10 11:03:21 -0700
+
+    update dev dependencies
+
+commit 36e4a824f340fdee7ed50937ba8e7f6bc7d17f81
+Author: David Lord <davidism@gmail.com>
+Date:   2026-05-31 07:42:46 -0700
+
+    Any for  CertParamType type
+
+commit 954f5684e4841aad84a8eec7ace7b81a0d3f6831
+Author: David Lord <davidism@gmail.com>
+Date:   2026-05-18 16:35:44 -0700
+
+    update dev dependencies
+
+commit 9fcd34c9f3065640bd1cd86234216ca068633fb9
+Merge: 7374c85 1d49747
+Author: David Lord <davidism@gmail.com>
+Date:   2026-05-13 07:37:53 -0700
+
+    Merge branch 'stable'
+
+commit 1d49747264554dee31f5627d4249d09aaaeced39
+Author: David Lord <davidism@gmail.com>
+Date:   2026-05-13 07:37:21 -0700
+
+    update flask-mongoengine link
+
+commit 7374c85ddefc3f4b177a698ab9f0cbb6a5c0b392
+Author: David Lord <davidism@gmail.com>
+Date:   2026-05-02 05:59:12 -0700
+
+    remove leftover setuptools
+
+commit dcbede0cb00df32e7f1895e19e37d5f40a75d1f6
+Merge: 06ea505 9368fb3
+Author: David Lord <davidism@gmail.com>
+Date:   2026-05-01 20:58:56 -0700
+
+    autoescape selection uses case-insensitive comparison (#6013)
+
+commit 9368fb3f3c52d74534d14c1bef03c79c103356cd
+Author: David Lord <davidism@gmail.com>
+Date:   2026-05-01 20:53:36 -0700
+
+    case-insensitive comparison
+
+commit 06ea505ce2b2042af26e96d35ebf159af7c0869d
+Author: David Lord <davidism@gmail.com>
+Date:   2026-05-01 20:17:23 -0700
+
+    separate copy per call
+
+commit 2ac89889f4cc330eabd50f295dcef02828522c69
+Merge: 258d68b 6893620
+Author: David Lord <davidism@gmail.com>
+Date:   2026-04-08 21:04:03 -0700
+
+    Merge branch 'stable'
+
+commit 689362089edd09b6d68f7cfe99075e1345e0fede
+Author: David Lord <davidism@gmail.com>
+Date:   2026-04-08 21:01:29 -0700
+
+    fix typo
+
+commit 258d68b6ff5e2244386540f48b48bab90d6ab827
+Merge: e4e4bf6 a31e6b7
+Author: David Lord <davidism@gmail.com>
+Date:   2026-04-05 12:32:14 -0700
+
+    Merge branch 'stable'
+
+commit a31e6b73469cb2bf7eb8f70b5ff21f710fd2e23c
+Author: David Lord <davidism@gmail.com>
+Date:   2026-04-05 12:31:01 -0700
+
+    remove werkzeug host tests
+
+commit e4e4bf6543ac1f132afddb1ffd0bf02bea4c93f7
+Merge: 7ef2946 b21425d
+Author: David Lord <davidism@gmail.com>
+Date:   2026-04-05 11:24:48 -0700
+
+    Merge branch 'stable'
+
+commit b21425d6df207fec0c47e9563faa10a2819984ca
+Author: David Lord <davidism@gmail.com>
+Date:   2026-04-05 11:13:13 -0700
+
+    reduce venv size
+
+commit 83dbcb222a65a87741c9d96bb183f34528149269
+Author: David Lord <davidism@gmail.com>
+Date:   2026-04-03 15:59:16 -0700
+
+    update dev dependencies
+
+commit 7ef2946fb5151b745df30201b8c27790cac53875
+Merge: 4cae5d8 91c6b3f
+Author: David Lord <davidism@gmail.com>
+Date:   2026-03-24 06:55:57 -0700
+
+    remove unicode host test (#5962)
+
+commit 91c6b3fecf36b1f04554e57cc4060ccb737a445d
+Author: David Lord <davidism@gmail.com>
+Date:   2026-03-24 06:47:30 -0700
+
+    remove unicode host test
+
+commit 4cae5d8e411b1e69949d8fae669afeacbd3e5908
+Merge: 3a9d54f a197702
+Author: David Lord <davidism@gmail.com>
+Date:   2026-03-08 16:21:50 -0700
+
+    Merge branch 'stable'
+
+commit a197702e2cbcdd43c0d09296b3cea02efe16e407
+Author: David Lord <davidism@gmail.com>
+Date:   2026-03-08 16:20:07 -0700
+
+    update dev dependencies
+
+commit 4774385abdc04d3b0d02dcbed6543bc100f23f6e
+Merge: a29f88c 560c119
+Author: David Lord <davidism@gmail.com>
+Date:   2026-03-08 16:15:00 -0700
+
+    add zizmor to scan workflows (#5945)
+
+commit 560c119e3dc33b35b9c57172fae521d99c2a1421
+Author: David Lord <davidism@gmail.com>
+Date:   2026-03-08 16:05:00 -0700
+
+    add zizmor to scan workflows
+
+commit 3a9d54f3da1de540adfdf6f1e2dea6fc0006e15d
+Merge: c34d6e8 a29f88c
+Author: David Lord <davidism@gmail.com>
+Date:   2026-03-04 07:36:21 -0800
+
+    Merge branch 'stable'
+
+commit a29f88ce6f2f9843bd6fcbbfce1390a2071965d6
+Author: David Lord <davidism@gmail.com>
+Date:   2026-03-04 07:36:09 -0800
+
+    document that headers must be set before streaming

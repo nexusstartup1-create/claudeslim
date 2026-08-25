@@ -28,6 +28,8 @@ __all__ = [
     "run_git",
 ]
 
+from .traces import collapse_traces
+
 ANSI_RE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 
 _NOISE_PREFIXES = (
@@ -280,16 +282,28 @@ _DATE = re.compile(r"^Date:\s*(.+)$")
 _MERGE = re.compile(r"^Merge:\s")
 
 
+#: Trailers carry attribution and process, not architecture. They are the bulk
+#: of a commit body on projects that use them, and none of it answers "how does
+#: this codebase work".
+_TRAILER = re.compile(
+    r"^(Co-authored-by|Signed-off-by|Reviewed-by|Acked-by|Tested-by|Reported-by"
+    r"|Suggested-by|Cc|Fixes|Closes|Refs|Change-Id|Link|See-also)\s*:",
+    re.IGNORECASE,
+)
+
+
 def clean_log(
     text: str,
     *,
     keep_body: bool = False,
     drop_merges: bool = True,
     max_subject: int = 100,
+    group: bool = True,
 ) -> str:
     """Flatten ``git log`` output into ``<sha> <date> <author> — <subject>``."""
     text = ANSI_RE.sub("", text)
     out: list[str] = []
+    rows_key = [""]  # last emitted "date author" header, for run-length grouping
     sha = author = date = ""
     subject = ""
     body: list[str] = []
@@ -298,10 +312,24 @@ def clean_log(
     def flush() -> None:
         nonlocal sha, author, date, subject, body, is_merge
         if sha and not (drop_merges and is_merge):
-            head = f"{sha[:8]} {date} {author} — {subject[:max_subject]}"
-            out.append(head.strip())
+            if group:
+                # Consecutive commits by the same author on the same day repeat
+                # 20-30 characters of identical prefix each. Emit the prefix
+                # once and indent the run under it.
+                key = f"{date} {author}".strip()
+                if key and key != rows_key[0]:
+                    out.append(key)
+                    rows_key[0] = key
+                indent = "  " if key else ""
+                out.append(f"{indent}{sha[:8]} {subject[:max_subject]}".rstrip())
+            else:
+                out.append(f"{sha[:8]} {date} {author} — {subject[:max_subject]}".strip())
             if keep_body:
-                out.extend(f"    {line}" for line in body[:5] if line.strip())
+                out.extend(
+                    f"    {line}"
+                    for line in body[:5]
+                    if line.strip() and not _TRAILER.match(line)
+                )
         sha = author = date = subject = ""
         body = []
         is_merge = False
@@ -385,11 +413,21 @@ def clean_terminal(
     *,
     strip_timestamps: bool = True,
     collapse_repeats: bool = True,
+    collapse_frames: bool = True,
     max_line_len: int = 400,
     max_lines: int = 4_000,
 ) -> str:
-    """De-noise pasted terminal / CI output before feeding it to Claude."""
+    """De-noise pasted terminal / CI output before feeding it to Claude.
+
+    ``collapse_frames`` folds recursive and third-party stack frames — the two
+    things that make a failing run long without making it informative.
+    """
     text = ANSI_RE.sub("", text)
+    if collapse_frames:
+        # Before the line-level passes: folding needs whole frames, and the
+        # repeated-line collapser below would otherwise chew them one line at
+        # a time and never see the repeat.
+        text = collapse_traces(text)
     lines: list[str] = []
     # NB: split on "\n" only — str.splitlines() would also break on the bare
     # "\r" that progress bars use to rewrite themselves, which is exactly the

@@ -69,6 +69,43 @@ git diff | cslim clean | claude -p "review this diff"
 pytest 2>&1 | cslim clean | claude -p "why is this failing?"
 ```
 
+### `cslim test` — run the suite, keep only what failed
+
+```bash
+cslim test                                  # defaults to pytest -q
+cslim test --claude -p "why does this fail?"
+cslim test -- npm test                      # any runner; cslim flags go first
+```
+
+A passing run collapses to its summary line. A failing one keeps the failures,
+the assertion text and the short summary, and drops the session header, the
+progress dots and the warnings section. Measured on a real 91-test run of this
+project's own suite with one deliberate failure: **584 → 283 tokens (−51.5%)**.
+
+### Stack-trace folding — inside `clean` and `test`
+
+Recursive frames collapse to one plus a count, and runs of third-party frames
+become a single line with the boundary frame kept, because that is where your
+code handed control over:
+
+```
+test_cart.py:7: in deep
+    return deep(n - 1)
+    ⋮ same frame × 6
+```
+
+Measured on a real pytest run containing a six-deep recursion: **1,342 → 1,173
+tokens (−12.6%)**. The saving scales with how deep the traces are; on this
+fixture most of the output is assertion text, which is kept.
+
+### `cslim log` — history without the ceremony
+
+40 commits of `pallets/flask` history: **2,207 → 379 tokens (−82.8%)**. Blob
+SHAs shorten, `Author:`/`Date:` ceremony goes, merge commits drop by default,
+and consecutive commits by one author on one day state that once instead of per
+line (`--flat` keeps the old self-contained form, at −80.8%). Trailers —
+`Co-authored-by`, `Signed-off-by`, `Closes` — are stripped from bodies.
+
 ### `--index-only` (`-I`) — the ultralight map
 
 One line per file naming what it defines. No signatures, no types, no bodies.

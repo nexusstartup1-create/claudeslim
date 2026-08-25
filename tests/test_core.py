@@ -310,7 +310,10 @@ def test_clean_log() -> None:
     )
     out = clean_log(raw)
     assert "merge branch" not in out, "merge commits dropped by default"
-    assert out == "ffffff12 2026-01-04 Bob — fix the parser"
+    # Grouping is the default: the date and author head a run, the commits sit
+    # under it. `--flat` still gives one self-contained line per commit.
+    assert out == "2026-01-04 Bob\n  ffffff12 fix the parser"
+    assert clean_log(raw, group=False) == "ffffff12 2026-01-04 Bob — fix the parser"
     assert "merge branch" in clean_log(raw, drop_merges=False)
 
 

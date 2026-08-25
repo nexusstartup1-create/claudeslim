@@ -1,0 +1,28 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.14.6, pytest-9.1.1, pluggy-1.6.0
+rootdir: /Users/albertogalli/squeezecode
+configfile: pyproject.toml
+testpaths: tests
+collected 91 items
+
+tests/test_cli.py .........                                              [  9%]
+tests/test_core.py ............................                          [ 40%]
+tests/test_delivery.py .................                                 [ 59%]
+tests/test_hook.py .............................                         [ 91%]
+tests/test_ranking.py .......                                            [ 98%]
+tests/test_tmp_break.py F                                                [100%]
+
+=================================== FAILURES ===================================
+_________________ test_estimator_matches_an_exact_expectation __________________
+
+    def test_estimator_matches_an_exact_expectation():
+>       assert HeuristicEstimator().count("def f(x): return x") == 999
+E       AssertionError: assert 6 == 999
+E        +  where 6 = count('def f(x): return x')
+E        +    where count = <cslim.core.tokenizer.HeuristicEstimator object at 0x10b1f34d0>.count
+E        +      where <cslim.core.tokenizer.HeuristicEstimator object at 0x10b1f34d0> = HeuristicEstimator()
+
+tests/test_tmp_break.py:5: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_tmp_break.py::test_estimator_matches_an_exact_expectation
+========================= 1 failed, 90 passed in 0.80s =========================

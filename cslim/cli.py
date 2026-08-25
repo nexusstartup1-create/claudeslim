@@ -577,6 +577,9 @@ def log_cmd(
     paths: Optional[List[str]] = typer.Argument(None),
     body: bool = typer.Option(False, "--body", help="Keep the first lines of commit bodies."),
     merges: bool = typer.Option(False, "--merges", help="Keep merge commits."),
+    flat: bool = typer.Option(
+        False, "--flat", help="One self-contained line per commit, no grouping."
+    ),
     stdin_input: bool = typer.Option(False, "--stdin"),
     out: Optional[Path] = typer.Option(None, "--out", "-o"),
     clip: bool = typer.Option(False, "--clip", "-c"),
@@ -595,7 +598,7 @@ def log_cmd(
         except GitError as exc:
             _fail(str(exc))
             return
-    text = clean_log(raw, keep_body=body, drop_merges=not merges)
+    text = clean_log(raw, keep_body=body, drop_merges=not merges, group=not flat)
     if not text:
         console.print("[cslim.warn]![/] [cslim.dim]no commits[/]")
         raise typer.Exit()
@@ -620,6 +623,9 @@ def clean(
     file: Optional[Path] = typer.Argument(None, help="File to clean (default: stdin)."),
     keep_timestamps: bool = typer.Option(False, "--keep-timestamps"),
     keep_repeats: bool = typer.Option(False, "--keep-repeats"),
+    keep_frames: bool = typer.Option(
+        False, "--keep-frames", help="Do not fold recursive/vendor stack frames."
+    ),
     max_lines: int = typer.Option(4000, "--max-lines"),
     out: Optional[Path] = typer.Option(None, "--out", "-o"),
     clip: bool = typer.Option(False, "--clip", "-c"),
@@ -644,6 +650,7 @@ def clean(
         raw,
         strip_timestamps=not keep_timestamps,
         collapse_repeats=not keep_repeats,
+        collapse_frames=not keep_frames,
         max_lines=max_lines,
     )
     mode = _resolve_mode(out, clip, to_claude or prompt is not None, stdout_flag)
@@ -786,6 +793,55 @@ def hook(
     if outcome.stdout:
         sys.stdout.write(outcome.stdout)
     raise typer.Exit(0)
+
+
+@app.command("test")
+def test_cmd(
+    command: Optional[List[str]] = typer.Argument(
+        None, help="Test command (default: pytest -q). Use -- before its flags."
+    ),
+    context: int = typer.Option(3, "--context", "-C", help="Lines kept around a failure."),
+    timeout: Optional[float] = typer.Option(None, "--timeout", help="Seconds before giving up."),
+    out: Optional[Path] = typer.Option(None, "--out", "-o"),
+    clip: bool = typer.Option(False, "--clip", "-c"),
+    to_claude: bool = typer.Option(False, "--claude"),
+    prompt: Optional[str] = typer.Option(None, "--prompt", "-p"),
+    stdout_flag: bool = typer.Option(False, "--stdout"),
+    quiet: bool = typer.Option(False, "--quiet", "-q"),
+) -> None:
+    """Run a test command and emit only what failed.
+
+    Pure subtraction — nothing is injected, so it cannot cost more than not
+    using it. Measured on a real 91-test run with one failure: -51.5% tokens.
+    """
+    from .core.testrun import run_tests
+    from .core.traces import collapse_traces
+
+    argv = list(command) if command else ["pytest", "-q"]
+    result = run_tests(argv, context=context, timeout=timeout)
+
+    if result.exit_code == 127:
+        _fail(f"{result.output}\n  Pass the command explicitly, e.g. cslim test -- pytest -q")
+        return
+
+    body = collapse_traces(result.output)
+    payload = body if body.strip() else "all tests passed"
+
+    mode = _resolve_mode(out, clip, to_claude or prompt is not None, stdout_flag)
+    code = _emit(payload + "\n", mode=mode, out=out, prompt=prompt, model=None, quiet=quiet)
+
+    if not quiet:
+        verdict = (
+            "[cslim.ok]✔ passed[/]" if result.passed else "[cslim.danger]✖ failed[/]"
+        )
+        console.print(
+            f"{verdict} [cslim.dim]{' '.join(argv)} · "
+            f"{result.raw_lines} → {len(payload.splitlines())} lines[/]"
+        )
+        for warning in result.warnings:
+            console.print(f"  [cslim.warn]![/] [cslim.dim]{escape(warning)}[/]")
+    # the command's own verdict is the useful exit code
+    raise typer.Exit(result.exit_code if result.exit_code else code)
 
 
 @app.command("map")
