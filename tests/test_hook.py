@@ -10,6 +10,7 @@ import pytest
 from cslim.core.hook import HookConfig, run_hook
 from cslim.core.installer import (
     InstallScope,
+    _is_ours,
     hook_status,
     install_hook,
     settings_path,
@@ -167,7 +168,7 @@ def test_install_is_idempotent(tmp_path: Path) -> None:
     groups = data["hooks"]["UserPromptSubmit"]
     assert len(groups) == 1
     assert groups[0]["hooks"][0]["type"] == "command"
-    assert "cslim hook" in groups[0]["hooks"][0]["command"]
+    assert _is_ours(groups[0]["hooks"][0]), groups[0]["hooks"][0]["command"]
 
 
 def test_install_preserves_unrelated_settings(tmp_path: Path) -> None:
@@ -200,7 +201,7 @@ def test_install_preserves_unrelated_settings(tmp_path: Path) -> None:
         for h in g["hooks"]
     ]
     assert "echo hi" in commands, "somebody else's hook survived"
-    assert any("cslim hook" in c for c in commands)
+    assert any(_is_ours({"command": c}) for c in commands)
 
 
 def test_uninstall_removes_only_ours(tmp_path: Path) -> None:
@@ -250,7 +251,8 @@ def test_invalid_settings_json_is_reported_not_clobbered(tmp_path: Path) -> None
 def test_hook_status_reports_scopes(tmp_path: Path) -> None:
     install_hook(InstallScope.PROJECT, project_dir=tmp_path)
     status = dict((scope, cmd) for scope, _path, cmd in hook_status(tmp_path))
-    assert status[InstallScope.PROJECT] and "cslim hook" in status[InstallScope.PROJECT]
+    assert status[InstallScope.PROJECT]
+    assert _is_ours({"command": status[InstallScope.PROJECT]})
     assert status[InstallScope.LOCAL] is None
 
 
