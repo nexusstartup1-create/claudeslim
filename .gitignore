@@ -39,3 +39,6 @@ Thumbs.db
 # the marketing site lives here but is deployed straight to Vercel,
 # not through this repository
 docs/
+
+# empty Next.js scaffold, kept locally
+cslim-site/
