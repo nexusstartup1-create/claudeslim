@@ -236,6 +236,31 @@ cslim uninstall                      # removes only our entry, leaves other hook
 
 ---
 
+### `cslim graph` — the reference graph, as an artefact
+
+The graph that decides which files earn a full skeleton under a budget is the
+most informative thing cslim computes, and it used to be thrown away after
+ranking. It now exports:
+
+```bash
+cslim graph . -f graphml -o repo.graphml   # Gephi, yEd, Cytoscape, networkx
+cslim graph . -f json    -o repo.json      # D3, networkx node-link
+cslim graph . -f dot     -o repo.dot       # dot -Tsvg repo.dot > repo.svg
+cslim graph . --no-symbols                 # files and references only
+```
+
+Nodes are files and symbols; edges run *user → used*, so in-degree is "how many
+files rely on this". On flask: 80 files, 1,680 symbols, 241 references, and the
+five most depended-on files are exactly the ones you would name by hand —
+`app.py` (38), `globals.py` (31), `wrappers.py` (16), `helpers.py` (12).
+
+No new dependency: GraphML is XML, DOT is text, JSON is JSON.
+
+**Every discovered file gets exactly one node, keyed by path.** That invariant
+is tested, because the obvious shortcut — keying by module name — silently
+merges every `__init__.py` in a repository and attributes each file's classes to
+the others.
+
 ## Measured against another tool
 
 The first cost A/B in this category against a competitor. Both maps spliced

@@ -18,7 +18,7 @@ DEFAULT_COMMAND = "pack"
 _COMMANDS = frozenset(
     {
         "pack", "stats", "diff", "log", "clean",
-        "models", "doctor", "tui", "hook", "install", "uninstall", "map", "test",
+        "models", "doctor", "tui", "hook", "install", "uninstall", "map", "test", "graph",
     }
 )
 

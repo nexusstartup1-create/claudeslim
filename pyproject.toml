@@ -42,7 +42,10 @@ all = [
   "tree-sitter>=0.23", "tree-sitter-javascript>=0.23",
   "tree-sitter-typescript>=0.23", "tree-sitter-go>=0.23",
 ]
-dev = ["pytest>=8.0", "mypy>=1.10", "ruff>=0.5"]
+# networkx is a test-only dependency: `cslim graph` writes GraphML by hand, and
+# the acceptance test reads it back with the library people actually open it
+# with. Without it that test skips, and a skipped test verifies nothing.
+dev = ["pytest>=8.0", "mypy>=1.10", "ruff>=0.5", "networkx>=3.0"]
 
 [project.scripts]
 # NB: no `claudeslim` alias — that name is taken on PyPI by an unrelated

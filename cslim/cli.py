@@ -795,6 +795,59 @@ def hook(
     raise typer.Exit(0)
 
 
+@app.command("graph")
+def graph_cmd(
+    paths: Optional[List[Path]] = typer.Argument(None, help="Paths to analyse."),
+    fmt: str = typer.Option("graphml", "--format", "-f", help="graphml | json | dot."),
+    out: Optional[Path] = typer.Option(None, "--out", "-o", help="Write to a file."),
+    symbols: bool = typer.Option(True, "--symbols/--no-symbols", help="Include symbol nodes."),
+    lang: Optional[List[str]] = typer.Option(None, "--lang", "-l"),
+    quiet: bool = typer.Option(False, "--quiet", "-q"),
+) -> None:
+    """Export the reference graph — who defines what, and who uses it.
+
+    The same graph that decides which files earn a full skeleton under a token
+    budget, in a form Gephi, Graphviz, networkx or D3 can open.
+    """
+    from .core.graphexport import build_graph, to_dot, to_graphml, to_json
+
+    if fmt not in ("graphml", "json", "dot"):
+        _fail("--format must be one of: graphml, json, dot")
+
+    request = CompressRequest(
+        paths=tuple(paths) if paths else (Path.cwd(),),
+        discovery=DiscoveryOptions(languages=_languages(lang)),
+        render_payload=False,
+    )
+    bundle = _run_with_progress(request, quiet)
+    if not bundle.files:
+        _fail("no source files found")
+
+    graph = build_graph(bundle.files, symbols=symbols)
+    if fmt == "graphml":
+        text = to_graphml(graph)
+    elif fmt == "json":
+        text = to_json(graph)
+    else:
+        text = to_dot(graph, symbols=symbols)
+
+    if out is not None:
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(text, encoding="utf-8")
+    else:
+        sys.stdout.write(text)
+
+    if not quiet:
+        refs = sum(1 for e in graph.edges if e.kind == "references")
+        console.print(
+            f"[cslim.ok]✔[/] [cslim.text]{len(graph.file_nodes)} files, "
+            f"{len(graph.symbol_nodes)} symbols, {refs} references[/]"
+            + (f" [cslim.dim]→[/] [cslim.path]{escape(str(out))}[/]" if out else "")
+        )
+        if len(graph.file_nodes) != len(bundle.files):
+            console.print("[cslim.danger]![/] node count does not match file count")
+
+
 @app.command("test")
 def test_cmd(
     command: Optional[List[str]] = typer.Argument(

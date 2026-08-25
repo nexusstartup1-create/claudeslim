@@ -54,6 +54,7 @@ from .git_cleaner import (
     git_diff,
     git_log,
 )
+from .graphexport import Graph, GraphEdge, GraphNode, build_graph, to_dot, to_graphml, to_json
 from .hook import HookConfig, HookOutcome, build_map, run_hook
 from .installer import (
     InstallResult,
@@ -102,6 +103,9 @@ __all__ = [
     "DiscoveryOptions",
     "GitCleanOptions",
     "GitError",
+    "Graph",
+    "GraphEdge",
+    "GraphNode",
     "HookConfig",
     "HookOutcome",
     "InstallResult",
@@ -117,6 +121,7 @@ __all__ = [
     "TokenBudget",
     "TokenStats",
     "banner",
+    "build_graph",
     "build_map",
     "claude_binary",
     "claude_md_path",
@@ -151,6 +156,9 @@ __all__ = [
     "send_to_claude",
     "stdin_has_data",
     "stdout_is_pipe",
+    "to_dot",
+    "to_graphml",
+    "to_json",
     "uninstall_hook",
     "write_map",
 ]
