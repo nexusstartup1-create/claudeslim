@@ -120,6 +120,35 @@ core/ranking.py: FileRank, build_reference_graph, rank_files
 | cslim | 18 | 43.9k tokens | **461 tokens** |
 | pallets/flask | 80 | 143.9k tokens | **3.1k tokens** |
 
+### `--outline` (`-O`) — the middle tier
+
+Grouped names per file: imports, environment variables, constants, classes,
+functions, methods. No signatures.
+
+```
+src/flask/cli.py
+  imports: ast, collections.abc, importlib.metadata, inspect, os, platform
+  env: FLASK_DEBUG, FLASK_RUN_FROM_CLI, PYTHONSTARTUP
+  classes: NoAppException, ScriptInfo, AppGroup, FlaskGroup, CertParamType
+  functions: find_best_app, load_dotenv, show_server_banner, routes_command
+```
+
+An index line answers *which file*, a skeleton answers *what is the signature*.
+Between them sits *what does this module contain*, which is the question you
+actually ask while orienting.
+
+| tier | flask (80 files) | vs source |
+| --- | --- | --- |
+| `--index-only` | 2,817 tokens | −98.1% |
+| **`--outline`** | **6,187 tokens** | **−95.7%** |
+| full skeleton | 32,176 tokens | −77.8% |
+
+Environment variables are extracted from the **source**, not the skeleton —
+`os.environ[...]` lives inside a function body, which is exactly what a skeleton
+removes. A skeleton hides how a project is configured; the outline names it.
+Recognised across Python, JS/TS and Go (`os.environ`, `os.getenv`,
+`process.env`, `os.Getenv`).
+
 ### Full AST skeletons — the detailed map
 
 Signatures, type hints, class hierarchies, imports and summary docstrings, with

@@ -27,7 +27,13 @@ from .models import (
     sum_stats,
 )
 from .ranking import rank_files
-from .renderer import RenderOptions, build_index_line, render_bundle
+from .renderer import (
+    RenderOptions,
+    build_index_line,
+    build_outline,
+    environment_variables,
+    render_bundle,
+)
 from .tokenizer import (
     ModelSpec,
     TokenBudget,
@@ -57,6 +63,8 @@ class CompressRequest:
     exact_tokens: bool = False
     render_payload: bool = True
     """Set False for a stats-only pass (``cslim stats``)."""
+    outline_only: bool = False
+    """Emit every file as a grouped outline — the middle tier."""
     index_only: bool = False
     """Emit only the index tier — no skeletons at all.
 
@@ -123,6 +131,8 @@ class CompressionService:
                 compressed_tokens=estimator.count(result.text),
                 errors=result.errors,
                 fallback=result.fallback,
+                # from the source: the skeleton has no bodies to find them in
+                env_vars=environment_variables(source),
             )
             bundle.files.append(compressed)
 
@@ -137,6 +147,8 @@ class CompressionService:
         for file in bundle.files:
             file.index_line = build_index_line(file)
             file.index_tokens = estimator.count(file.index_line)
+            file.outline = build_outline(file)
+            file.outline_tokens = estimator.count(file.outline)
 
         budget = TokenBudget.for_model(
             model, max_tokens=request.max_tokens, context_window=request.context_window
@@ -144,6 +156,9 @@ class CompressionService:
         if request.index_only:
             for file in bundle.files:
                 file.level = DetailLevel.INDEX
+        elif request.outline_only:
+            for file in bundle.files:
+                file.level = DetailLevel.OUTLINE
         elif request.max_tokens is not None:
             self._apply_budget(bundle, budget)
 
@@ -241,6 +256,7 @@ def compress_paths(
     render: RenderOptions | None = None,
     model: str = "sonnet",
     max_tokens: int | None = None,
+    outline_only: bool = False,
     index_only: bool = False,
     progress: ProgressCallback | None = None,
 ) -> Bundle:
@@ -252,6 +268,7 @@ def compress_paths(
         render=render or RenderOptions(),
         model=model,
         max_tokens=max_tokens,
+        outline_only=outline_only,
         index_only=index_only,
     )
     return CompressionService(progress=progress).run(request)

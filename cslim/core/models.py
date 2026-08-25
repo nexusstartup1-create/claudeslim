@@ -162,6 +162,14 @@ class DetailLevel(str, Enum):
     """
 
     SKELETON = "skeleton"
+    """Signatures, types, class hierarchies — everything but the bodies."""
+    OUTLINE = "outline"
+    """Names only, grouped: imports, env vars, constants, classes, functions.
+
+    The middle tier. An index line answers "which file?", a skeleton answers
+    "what is the signature?", and between them sits "what does this module
+    contain?" — which is the question you actually ask while orienting.
+    """
     INDEX = "index"
     OMITTED = "omitted"
 
@@ -189,6 +197,16 @@ class CompressedFile:
     index_line: str = ""
     """One-line summary: what this file offers, without any signatures."""
     index_tokens: int = 0
+    env_vars: list[str] = field(default_factory=list)
+    """Environment variables the file reads.
+
+    Extracted from the *source*, not the skeleton: `os.environ[...]` lives
+    inside a function body, and the skeleton is exactly what has no bodies. An
+    outline that scanned the skeleton would show an empty env section forever.
+    """
+    outline: str = ""
+    """Grouped names — imports, env, constants, classes, functions."""
+    outline_tokens: int = 0
     rank: float = 0.0
     """Architectural importance from :mod:`cslim.core.ranking`."""
 
@@ -199,6 +217,8 @@ class CompressedFile:
             return 0
         if self.level is DetailLevel.INDEX:
             return self.index_tokens
+        if self.level is DetailLevel.OUTLINE:
+            return self.outline_tokens
         return self.compressed_tokens
 
     @property
@@ -220,6 +240,8 @@ class TokenStats:
     files: int = 0
     indexed_files: int = 0
     """Files rendered as a one-line index rather than a full skeleton."""
+    outlined_files: int = 0
+    """Files rendered as a grouped outline."""
     dropped_files: int = 0
     model_id: str = ""
     context_window: int = 0

@@ -321,6 +321,10 @@ def pack(
         False, "--index-only", "-I",
         help="Ultralight map: one line per file naming what it defines.",
     ),
+    outline: bool = typer.Option(
+        False, "--outline", "-O",
+        help="Middle tier: grouped names per file — imports, env, classes, functions.",
+    ),
     all_files: bool = typer.Option(False, "--all", help="Include markdown/config files too."),
     hidden: bool = typer.Option(False, "--hidden", help="Do not skip dot-directories."),
     no_gitignore: bool = typer.Option(False, "--no-gitignore", help="Ignore .gitignore rules."),
@@ -384,6 +388,7 @@ def pack(
         context_window=context_window,
         exact_tokens=exact,
         index_only=index_only,
+        outline_only=outline,
     )
 
     if not quiet and not json_out and console.is_terminal and not stdout_is_pipe():

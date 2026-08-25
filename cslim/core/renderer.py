@@ -9,6 +9,7 @@ Three formats:
 
 from __future__ import annotations
 
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 
@@ -26,9 +27,12 @@ from .tokenizer import humanize
 __all__ = [
     "RenderOptions",
     "build_index_line",
+    "build_outline",
+    "environment_variables",
     "file_tree",
     "render_bundle",
     "render_header",
+    "render_outline",
 ]
 
 _FENCE_LANG: dict[Language, str] = {
@@ -78,6 +82,109 @@ def build_index_line(file: CompressedFile, max_symbols: int = 14) -> str:
     return f"{file.rel_path}: {', '.join(shown)}{suffix}"
 
 
+#: Where configuration comes from, across the languages cslim parses. Env vars
+#: answer "how is this deployed" and are invisible in a signature-only skeleton,
+#: so the outline names them separately.
+_ENV_PATTERNS = (
+    re.compile(r"""os\.environ(?:\.get)?\s*[\[(]\s*["']([A-Z_][A-Z0-9_]*)["']"""),
+    re.compile(r"""os\.getenv\s*\(\s*["']([A-Z_][A-Z0-9_]*)["']"""),
+    re.compile(r"""process\.env(?:\.([A-Z_][A-Z0-9_]*)|\[\s*["']([A-Z_][A-Z0-9_]*)["'])"""),
+    re.compile(r"""os\.Getenv\s*\(\s*["']([A-Z_][A-Z0-9_]*)["']"""),
+)
+
+_OUTLINE_GROUPS: tuple[tuple[str, frozenset[SymbolKind]], ...] = (
+    ("classes", frozenset({SymbolKind.CLASS, SymbolKind.STRUCT})),
+    ("interfaces", frozenset({SymbolKind.INTERFACE, SymbolKind.TYPE, SymbolKind.ENUM})),
+    ("functions", frozenset({SymbolKind.FUNCTION})),
+    ("constants", frozenset({SymbolKind.CONSTANT})),
+)
+
+
+def environment_variables(text: str) -> list[str]:
+    """Environment variables a file reads, in order of first appearance."""
+    found: list[str] = []
+    for pattern in _ENV_PATTERNS:
+        for match in pattern.finditer(text):
+            name = next((g for g in match.groups() if g), None)
+            if name and name not in found:
+                found.append(name)
+    return found
+
+
+def build_outline(file: CompressedFile, max_per_group: int = 24) -> str:
+    """A file's contents as grouped names — no signatures, no bodies.
+
+    Between an index line and a skeleton: it answers "what is in this module",
+    which is the question you ask while orienting, without paying for the
+    parameter lists you only need once you have chosen the file.
+    """
+    lines: list[str] = [file.rel_path]
+
+    # `from flask import a` and `from flask import b` are two symbols naming one
+    # module; listing it twice spends tokens saying nothing.
+    imports = list(
+        dict.fromkeys(s.name for s in file.symbols if s.kind is SymbolKind.IMPORT)
+    )
+    if imports:
+        lines.append(f"  imports: {_join(imports, max_per_group)}")
+
+    env = file.env_vars or environment_variables(file.skeleton)
+    if env:
+        lines.append(f"  env: {_join(env, max_per_group)}")
+
+    for label, kinds in _OUTLINE_GROUPS:
+        names: list[str] = []
+        for symbol in file.symbols:
+            if (
+                symbol.kind in kinds
+                and not symbol.name.startswith("__")
+                and symbol.name not in names
+            ):
+                names.append(symbol.name)
+        if names:
+            lines.append(f"  {label}: {_join(names, max_per_group)}")
+
+    # Methods are listed under their file rather than their class: the outline
+    # is a lookup aid, and "which file has `refresh`" is the question it serves.
+    methods = [
+        s.name for s in file.symbols
+        if s.kind is SymbolKind.METHOD and not s.name.startswith("__")
+    ]
+    unique_methods = list(dict.fromkeys(methods))
+    if unique_methods:
+        lines.append(f"  methods: {_join(unique_methods, max_per_group)}")
+
+    return "\n".join(lines) if len(lines) > 1 else file.rel_path
+
+
+def _join(names: list[str], limit: int) -> str:
+    shown = names[:limit]
+    suffix = f", +{len(names) - len(shown)} more" if len(names) > len(shown) else ""
+    return ", ".join(shown) + suffix
+
+
+_OUTLINE_PREAMBLE = (
+    "Files as grouped names — imports, environment variables, constants, "
+    "classes, functions, methods. No signatures: open the file once one of "
+    "these names is what you need."
+)
+
+
+def render_outline(
+    files: Sequence[CompressedFile], fmt: RenderFormat, *, note: bool = True
+) -> str:
+    """The middle tier: grouped names, one block per file."""
+    blocks = [f.outline or f.rel_path for f in files]
+    if not blocks:
+        return ""
+    body = "\n\n".join(blocks)
+    if fmt == "xml":
+        attrs = f' note="{_OUTLINE_PREAMBLE}"' if note else ""
+        return f"<outline{attrs}>\n{body}\n</outline>"
+    heading = f"## Outline\n{_OUTLINE_PREAMBLE}\n\n" if note else ""
+    return f"{heading}```\n{body}\n```"
+
+
 @dataclass(frozen=True, slots=True)
 class RenderOptions:
     format: RenderFormat = "md"
@@ -105,14 +212,27 @@ _INDEX_LEGEND = (
 )
 
 
+_OUTLINE_LEGEND = (
+    "Outline map from ClaudeSlim: each file's imports, environment variables, "
+    "constants, classes, functions and methods, by name. No signatures and no "
+    "bodies — open a file once one of these names is what you need."
+)
+
+
 def render_header(
-    stats: TokenStats, options: RenderOptions, *, index_only: bool = False
+    stats: TokenStats,
+    options: RenderOptions,
+    *,
+    index_only: bool = False,
+    outline_only: bool = False,
 ) -> str:
     # The legend must describe what's actually below it: promising preserved
-    # signatures in an index-only payload would send Claude looking for
+    # signatures in a payload that has none would send Claude looking for
     # information that isn't there.
     if index_only:
         lines = ["# ClaudeSlim file index", f"# {_INDEX_LEGEND}"]
+    elif outline_only:
+        lines = ["# ClaudeSlim outline", f"# {_OUTLINE_LEGEND}"]
     else:
         lines = ["# ClaudeSlim skeleton bundle", f"# {_LEGEND}"]
     if options.stats_comment:
@@ -189,12 +309,18 @@ def render_bundle(bundle: Bundle, options: RenderOptions | None = None) -> str:
     opts = options or RenderOptions()
     included = bundle.included
     skeletons = [f for f in included if f.level is DetailLevel.SKELETON]
+    outlined = [f for f in included if f.level is DetailLevel.OUTLINE]
     indexed = [f for f in included if f.level is DetailLevel.INDEX]
 
-    index_only = bool(included) and not skeletons
+    index_only = bool(included) and not skeletons and not outlined
+    outline_only = bool(outlined) and not skeletons and not indexed
     chunks: list[str] = []
     if opts.header:
-        chunks.append(render_header(bundle.stats, opts, index_only=index_only))
+        chunks.append(
+            render_header(
+                bundle.stats, opts, index_only=index_only, outline_only=outline_only
+            )
+        )
     if opts.tree and included:
         chunks.append(file_tree(included))
 
@@ -209,6 +335,8 @@ def render_bundle(bundle: Bundle, options: RenderOptions | None = None) -> str:
             if rendered:
                 chunks.append(rendered)
 
+    if outlined:
+        chunks.append(render_outline(outlined, opts.format, note=not outline_only))
     if indexed:
         # In index-only mode the header already explains the format; repeating
         # the note would be a second preamble for a payload this small.
