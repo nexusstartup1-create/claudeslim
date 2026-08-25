@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Alberto Galli — Who built cslim</title>
+<meta name="description" content="Fourteen years old, two years of programming, and a benchmark that proved his own tool wrong.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500&display=swap">
+<style>
+:root {
+  --void: #09090b;
+  --panel: #101014;
+  --amber: #ffb000;
+  --neon: #ff6600;
+  --copper: #b87333;
+  --text: #f2f0ec;
+  --muted: #8b8781;
+  --rule: rgba(255, 255, 255, 0.09);
+  --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --body: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--void);
+  color: var(--text);
+  font-family: var(--body);
+  font-size: 17px;
+  line-height: 1.72;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+.bloom { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.bloom::before {
+  content: ""; position: absolute;
+  width: 70vw; height: 70vw; min-width: 460px; min-height: 460px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 176, 0, 0.13), transparent 62%);
+  top: -26vw; left: -12vw; filter: blur(50px);
+}
+.bloom::after {
+  content: ""; position: absolute;
+  width: 55vw; height: 55vw; min-width: 380px; min-height: 380px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 102, 0, 0.10), transparent 62%);
+  bottom: -22vw; right: -14vw; filter: blur(60px);
+}
+.wrap { position: relative; z-index: 1; width: min(100% - 2.5rem, 46rem); margin-inline: auto; }
+
+.topbar { display: flex; justify-content: space-between; align-items: center; padding: 1.4rem 0; font-family: var(--mono); font-size: 0.82rem; }
+.topbar a { color: var(--muted); text-decoration: none; }
+.topbar a:hover { color: var(--amber); }
+.brand { color: var(--text); font-weight: 600; }
+.brand b { color: var(--neon); }
+
+header.hero { padding: clamp(3rem, 10vh, 6rem) 0 clamp(2rem, 6vh, 3.5rem); }
+.eyebrow {
+  font-family: var(--mono); font-size: 0.74rem; letter-spacing: 0.2em;
+  text-transform: uppercase; color: var(--neon); margin: 0 0 1.2rem;
+}
+h1 {
+  font-family: var(--display); font-weight: 700;
+  font-size: clamp(2.4rem, 6.5vw, 4rem);
+  letter-spacing: -0.035em; line-height: 1.04;
+  margin: 0 0 1.2rem; text-wrap: balance;
+}
+h1 .amb { color: var(--amber); }
+.sub { font-size: clamp(1.05rem, 2.2vw, 1.2rem); color: var(--muted); max-width: 40ch; }
+
+h2 {
+  font-family: var(--display); font-weight: 600;
+  font-size: clamp(1.4rem, 3vw, 1.9rem);
+  letter-spacing: -0.025em; margin: 3.2rem 0 1rem; text-wrap: balance;
+}
+p { margin: 0 0 1.15rem; max-width: 62ch; }
+p.muted { color: var(--muted); }
+strong { font-weight: 500; color: var(--amber); }
+a { color: var(--amber); }
+
+.facts {
+  display: grid; gap: 1px; background: var(--rule);
+  border: 1px solid var(--rule); border-radius: 14px; overflow: hidden;
+  margin: 2.2rem 0;
+}
+@media (min-width: 620px) { .facts { grid-template-columns: repeat(3, 1fr); } }
+.fact { background: var(--panel); padding: 1.1rem 1.2rem; }
+.fact b {
+  display: block; font-family: var(--display); font-weight: 700;
+  font-size: 1.9rem; letter-spacing: -0.03em; color: var(--amber);
+}
+.fact span { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+
+blockquote {
+  margin: 2rem 0; padding: 0 0 0 1.4rem;
+  border-left: 3px solid var(--neon);
+  font-family: var(--display); font-weight: 500;
+  font-size: clamp(1.15rem, 2.6vw, 1.5rem);
+  line-height: 1.35; letter-spacing: -0.02em;
+  color: var(--text); max-width: 30ch;
+}
+
+.thanks { display: grid; gap: 0.9rem; margin: 1.4rem 0 0; }
+@media (min-width: 620px) { .thanks { grid-template-columns: 1fr 1fr; } }
+.card {
+  background: var(--panel); border: 1px solid var(--rule);
+  border-radius: 14px; padding: 1.2rem 1.3rem;
+}
+.card h3 { font-family: var(--mono); font-size: 0.78rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--neon); margin: 0 0 0.5rem; }
+.card p { font-size: 0.92rem; margin: 0; color: var(--muted); }
+
+.cta { display: flex; flex-wrap: wrap; gap: 0.7rem; margin: 2.5rem 0 0; }
+.btn {
+  font-family: var(--mono); font-size: 0.85rem;
+  padding: 0.7rem 1.2rem; border-radius: 10px; text-decoration: none;
+  border: 1px solid transparent; transition: transform 0.2s ease, border-color 0.2s ease;
+}
+.btn-1 { background: var(--amber); color: #1a1200; font-weight: 600; }
+.btn-2 { border-color: var(--rule); color: var(--text); }
+.btn:hover { transform: translateY(-2px); }
+.btn-2:hover { border-color: var(--amber); }
+
+footer { border-top: 1px solid var(--rule); margin-top: 4rem; padding: 2.5rem 0 3.5rem; font-family: var(--mono); font-size: 0.8rem; color: var(--muted); }
+
+.reveal { opacity: 0; transform: translateY(18px); transition: opacity 0.8s ease, transform 0.8s ease; }
+.reveal.in { opacity: 1; transform: none; }
+:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; border-radius: 4px; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .reveal { opacity: 1; transform: none; transition: none; }
+}
+</style>
+</head>
+<body>
+<div class="bloom" aria-hidden="true"></div>
+
+<div class="wrap">
+  <div class="topbar">
+    <a class="brand" href="../">c<b>slim</b></a>
+    <nav><a href="../">The tool</a> · <a href="https://github.com/nexusstartup1-create/claudeslim">GitHub</a></nav>
+  </div>
+
+  <header class="hero">
+    <p class="eyebrow">Who built this</p>
+    <h1>I'm Alberto Galli.<br>I'm <span class="amb">14</span>.</h1>
+    <p class="sub">I've been programming for two years. cslim is the first thing I've built that I then tried to prove wrong — and did.</p>
+  </header>
+
+  <main>
+    <div class="facts">
+      <div class="fact"><b>14</b><span>years old</span></div>
+      <div class="fact"><b>2</b><span>years coding</span></div>
+      <div class="fact"><b>67</b><span>tests passing</span></div>
+    </div>
+
+    <section class="reveal">
+      <h2>How it started</h2>
+      <p>A friend showed me <strong>Python</strong>. That's the whole origin story — no course, no plan. He wrote something, it ran, and I wanted to know why.</p>
+      <p>Computing itself came from my uncle, <strong>Stefano Fratepietro</strong>. He's the reason I understood that software isn't just apps you install — it's something you can take apart, and something you can build.</p>
+    </section>
+
+    <section class="reveal">
+      <h2>What I learned building cslim</h2>
+      <p>I built a tool that compresses a codebase so Claude Code reads less of it. It works: 39,000 tokens down to 9,000, and a lighter mode that reaches 98%.</p>
+      <p>Then I measured what it actually <em>cost</em>, in dollars, across real sessions. Every configuration came out <strong>more expensive</strong> than doing nothing.</p>
+      <blockquote>The number I was proud of turned out to be the wrong number.</blockquote>
+      <p>Token count isn't cost. Prompt caching changes the maths: a cache read bills at about a tenth of base input, so re-reading a file is nearly free — and injecting new context is not. My tool had to prevent twelve times its own size in reading before it broke even. It didn't.</p>
+      <p>I could have shipped the 98% number and said nothing. I published the benchmarks that contradict it instead, and put a warning in the command that turns the feature on. That decision taught me more than the code did.</p>
+    </section>
+
+    <section class="reveal">
+      <h2>Thank you</h2>
+      <div class="thanks">
+        <div class="card">
+          <h3>My friend</h3>
+          <p>For showing me Python, without knowing it would turn into this.</p>
+        </div>
+        <div class="card">
+          <h3>My uncle Stefano</h3>
+          <p>For showing me that computing is something you take apart, not just something you use.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="reveal">
+      <h2>Where I'm going</h2>
+      <p>I want to become someone who matters in this field. I know that's a big thing to say at fourteen, and I know saying it isn't the same as doing it.</p>
+      <p class="muted">So for now I'm doing the small version of it: build something real, measure it honestly, publish what the measurements say — especially when they say I was wrong. If I keep doing that, the rest can follow.</p>
+      <div class="cta">
+        <a class="btn btn-1" href="https://github.com/nexusstartup1-create/claudeslim">See the code</a>
+        <a class="btn btn-2" href="../">Read the benchmarks</a>
+      </div>
+    </section>
+  </main>
+
+  <footer>Alberto Galli · cslim is MIT licensed · <a href="https://github.com/nexusstartup1-create/claudeslim">github.com/nexusstartup1-create/claudeslim</a></footer>
+</div>
+
+<script>
+(function () {
+  var items = document.querySelectorAll(".reveal");
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches || !("IntersectionObserver" in window)) {
+    for (var i = 0; i < items.length; i++) items[i].classList.add("in");
+    return;
+  }
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } });
+  }, { rootMargin: "0px 0px -12% 0px" });
+  for (var j = 0; j < items.length; j++) io.observe(items[j]);
+})();
+</script>
+</body>
+</html>
