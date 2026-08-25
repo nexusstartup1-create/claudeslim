@@ -1,0 +1,106 @@
+{
+  "schema": 1,
+  "generated": "2026-08-25T22:04:32+00:00",
+  "cslim_version": "0.1.0",
+  "project": {
+    "path": "/private/tmp/claude-501/-Users-albertogalli-squeezecode/9280f6c5-6ac0-45ac-9281-a0e7bc7ef834/scratchpad/flask",
+    "name": "flask",
+    "commit": "d318b68"
+  },
+  "design": {
+    "turns": 12,
+    "repeats": 6,
+    "task_set": "flask",
+    "tasks": [
+      "Which file and class implements the application context, and which attribute holds the pushed context stack? Path and names only.",
+      "Where is the blueprint's URL prefix combined with a route rule? Answer with the file and the method name only.",
+      "Which file decides the session cookie's SameSite and Secure flags? Answer with the file and the method name only.",
+      "Where does Flask load .env files, and which function does it? Path and function name only.",
+      "Which module turns a view's return value into a Response object, and which method does it? Path and method name only.",
+      "Where is the JSON provider configured, and which class implements the default one? Path and class name only.",
+      "Which function registers error handlers, and where are they looked up when an exception is raised? Two paths and two names.",
+      "Where is the `before_request` chain executed? Path and method name only.",
+      "Which file defines the CLI entry point for `flask run`? Path and function name only.",
+      "Where does Flask decide the static folder URL rule? Path and method only.",
+      "Which class holds application configuration, and which method loads it from an object? Path, class and method name.",
+      "Where is the request context popped, and what guarantees it happens on an exception? Path and mechanism in one sentence.",
+      "Which module implements the test client, and which class does it subclass? Path and class names only.",
+      "Where are template globals injected before rendering? Path and method name only.",
+      "Which function generates a URL for an endpoint, and where does it read the url adapter from? Path and names only."
+    ],
+    "hook_max_tokens": 25000
+  },
+  "control_spread_usd": 0.069252,
+  "run_to_run_spread_usd": 0.259367,
+  "arms": [
+    {
+      "name": "no map",
+      "sessions": 6,
+      "cost_usd_mean": 0.192599,
+      "cost_usd_per_session": [
+        0.310536,
+        0.154827,
+        0.147886,
+        0.245041,
+        0.15261,
+        0.144696
+      ],
+      "cache_creation_mean": 9356.5,
+      "total_tokens_mean": 11.7,
+      "vs_control_pct": 0.0,
+      "exceeds_spread": false
+    },
+    {
+      "name": "hook \u00b7 full AST",
+      "sessions": 6,
+      "cost_usd_mean": 0.278156,
+      "cost_usd_per_session": [
+        0.297983,
+        0.270284,
+        0.289239,
+        0.268805,
+        0.251702,
+        0.290926
+      ],
+      "cache_creation_mean": 18874.5,
+      "total_tokens_mean": 10.7,
+      "vs_control_pct": 44.42,
+      "exceeds_spread": false
+    },
+    {
+      "name": "CLAUDE.md \u00b7 full AST",
+      "sessions": 6,
+      "cost_usd_mean": 0.342093,
+      "cost_usd_per_session": [
+        0.690986,
+        0.157879,
+        0.167911,
+        0.660472,
+        0.162264,
+        0.213049
+      ],
+      "cache_creation_mean": 19830.5,
+      "total_tokens_mean": 8.3,
+      "vs_control_pct": 77.62,
+      "exceeds_spread": false
+    },
+    {
+      "name": "CLAUDE.md \u00b7 index",
+      "sessions": 6,
+      "cost_usd_mean": 0.189658,
+      "cost_usd_per_session": [
+        0.332469,
+        0.144111,
+        0.283511,
+        0.143189,
+        0.10276,
+        0.131907
+      ],
+      "cache_creation_mean": 9335.0,
+      "total_tokens_mean": 9.7,
+      "vs_control_pct": -1.53,
+      "exceeds_spread": false
+    }
+  ],
+  "verdict": "no measurable difference"
+}

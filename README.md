@@ -315,7 +315,7 @@ currently uses. The same map through `CLAUDE.md` costs about a fifth.
 > `CLAUDE.md` tracked by git (every refresh lands in diffs), untracked, or
 > gitignored — the clean case.
 >
-> **The multi-turn A/B has now been run, and it is inconclusive.**
+> **Two multi-turn A/B runs later, the cost question is still open.**
 >
 > Flask, 12 turns, 3 sessions per arm, five arms:
 >
@@ -337,10 +337,19 @@ currently uses. The same map through `CLAUDE.md` costs about a fifth.
 > if CLAUDE.md rides a prefix that was cached anyway. The other CLAUDE.md arm
 > did not reproduce it.
 >
-> So the +36% from `inject_probe` — single-turn, synthetic — is still the only
-> measurement of this delivery with an effect above its noise. The honest claim
-> remains *measured cheaper than the hook*, not *measured to beat sending
-> nothing*. See [Benchmarks](#benchmarks) for the per-session numbers.
+> A second run at **six** sessions per arm did not settle it either: every arm
+> stayed inside the spread, and an exact Mann-Whitney against the control put
+> the hook at p=0.065 — closest, still not significant.
+>
+> **One thing did replicate.** Cache write, across both runs: the hook roughly
+> doubles it (20,342 and 18,874 against controls of 14,044 and 9,356) while
+> `CLAUDE.md` leaves it at the control's level (9,518 and 9,335). That is the
+> mechanism `inject_probe` measured, now seen twice on real maps in real
+> sessions — a claim about *mechanism*, not about cost.
+>
+> So the honest claim is unchanged: *measured cheaper than the hook*, not
+> *measured to beat sending nothing*. See [RESULTS.md](bench/RESULTS.md) for
+> the per-session numbers and why one arm's bimodality dominates the spread.
 
 ### Which mode to use
 
