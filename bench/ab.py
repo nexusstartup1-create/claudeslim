@@ -30,6 +30,8 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
 
+from cslim.core.delivery import remove_map, write_map  # noqa: E402
+from cslim.core.hook import HookConfig, build_map  # noqa: E402
 from cslim.core.installer import (  # noqa: E402
     InstallScope,
     hook_command,
@@ -200,19 +202,47 @@ def record(arm: str, task: int, repeat: int, payload: dict[str, object]) -> Run:
 
 #: The arms compared by default. `None` means no hook at all (the control).
 ARMS: dict[str, dict[str, object] | None] = {
-    "no hook": None,
-    "full AST map": {"index_only": False},
-    "index only": {"index_only": True},
+    "no map": None,
+    "hook · full AST": {"delivery": "hook", "index_only": False},
+    "hook · index": {"delivery": "hook", "index_only": True},
+    "CLAUDE.md · full AST": {"delivery": "claude-md", "index_only": False},
+    "CLAUDE.md · index": {"delivery": "claude-md", "index_only": True},
 }
 
 
 def set_arm(spec: dict[str, object] | None, project: Path, max_tokens: int) -> None:
+    """Put the repository into exactly one delivery state.
+
+    Every arm tears down *both* delivery mechanisms before building its own.
+    Leaving the previous arm's CLAUDE.md section or hook in place would make
+    each arm measure the sum of itself and its predecessor.
+    """
+    uninstall_hook(InstallScope.PROJECT, project_dir=project)
+    remove_map(project)
+
     if spec is None:
-        uninstall_hook(InstallScope.PROJECT, project_dir=project)
         return
+
+    options = dict(spec)
+    delivery = str(options.pop("delivery", "hook"))
+
+    if delivery == "claude-md":
+        config = HookConfig(
+            max_tokens=max_tokens,
+            min_files=0,
+            index_only=bool(options.get("index_only", False)),
+        )
+        payload, tokens, files, _cached, _tier = build_map(config, project)
+        if not payload:
+            raise SystemExit(f"no source files under {project}: nothing to map")
+        result = write_map(payload, project_dir=project, tokens=tokens, files=files)
+        if result.action == "absent":
+            raise SystemExit("; ".join(result.warnings) or "could not write CLAUDE.md")
+        return
+
     install_hook(
         InstallScope.PROJECT,
-        command=hook_command(max_tokens=max_tokens, **spec),  # type: ignore[arg-type]
+        command=hook_command(max_tokens=max_tokens, **options),  # type: ignore[arg-type]
         project_dir=project,
     )
 

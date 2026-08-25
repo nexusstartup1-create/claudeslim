@@ -1,0 +1,42 @@
+name: check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    # The floor is what pyproject declares (3.10) and the ceiling is the newest
+    # release, because the AST shapes cslim walks change between versions and a
+    # skeleton extractor that only works on the developer's interpreter is not
+    # a skeleton extractor.
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.11", "3.12", "3.13"]
+        os: [ubuntu-latest]
+        include:
+          # The clipboard and hook paths have Windows branches; run the suite
+          # there too rather than claiming support we never execute.
+          - python: "3.12"
+            os: windows-latest
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Install
+        run: uv pip install --system -e ".[dev]"
+      - name: Tests
+        run: pytest -q
+      - name: Types
+        run: mypy cslim
+      - name: Lint
+        run: ruff check cslim bench

@@ -57,14 +57,23 @@ class ModelSpec:
         return f"{self.alias} ({self.id})"
 
 
-#: Context windows are conservative defaults; override with ``--context-window``
-#: when you run with an extended-context beta header.
+#: Verified against Anthropic's model overview table on 2026-08-25:
+#: https://platform.claude.com/docs/en/about-claude/models/overview
+#:
+#: These were previously guessed at 200k/64k across the board, which understated
+#: the Claude 5 context window by 5x and the max output by 2x. They are the only
+#: numbers in this project not derived from one of our own measurements, so they
+#: carry a source and a date instead.
+#:
+#: The authoritative live source is the Models API, which returns
+#: ``max_input_tokens`` and ``max_tokens`` per model:
+#: https://platform.claude.com/docs/en/api/models/list
+#: Pass ``--context-window`` to override any entry without editing this table.
 MODELS: dict[str, ModelSpec] = {
-    "opus": ModelSpec("claude-opus-5", "opus", 200_000, 64_000),
-    "sonnet": ModelSpec("claude-sonnet-5", "sonnet", 200_000, 64_000),
+    "fable": ModelSpec("claude-fable-5", "fable", 1_000_000, 128_000),
+    "opus": ModelSpec("claude-opus-5", "opus", 1_000_000, 128_000),
+    "sonnet": ModelSpec("claude-sonnet-5", "sonnet", 1_000_000, 128_000),
     "haiku": ModelSpec("claude-haiku-4-5-20251001", "haiku", 200_000, 64_000),
-    "fable": ModelSpec("claude-fable-5", "fable", 200_000, 64_000),
-    "sonnet-1m": ModelSpec("claude-sonnet-5", "sonnet-1m", 1_000_000, 64_000),
 }
 
 DEFAULT_MODEL = "sonnet"
@@ -80,7 +89,9 @@ def resolve_model(name: str | None) -> ModelSpec:
     for spec in MODELS.values():
         if spec.id == key:
             return spec
-    # Unknown id: assume a standard 200k Claude context rather than failing.
+    # Unknown id: assume the smaller current window rather than the larger one.
+    # Over-stating the budget silently truncates a map; under-stating it only
+    # makes cslim more conservative than it needs to be.
     return ModelSpec(name, name, 200_000, 64_000)
 
 

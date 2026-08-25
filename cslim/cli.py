@@ -788,6 +788,87 @@ def hook(
     raise typer.Exit(0)
 
 
+@app.command("map")
+def map_cmd(
+    paths: Optional[List[Path]] = typer.Argument(None, help="Paths to map (default: cwd)."),
+    lang: Optional[List[str]] = typer.Option(None, "--lang", "-l"),
+    max_tokens: int = typer.Option(25_000, "--max-tokens", "-t"),
+    aggressive: bool = typer.Option(False, "--aggressive", "-a"),
+    index_only: Optional[bool] = typer.Option(
+        None, "--index-only/--full-map", help="Force a tier. Default: per repository size."
+    ),
+    index_threshold: int = typer.Option(30, "--index-threshold"),
+    model: str = typer.Option("sonnet", "--model", "-m"),
+    remove: bool = typer.Option(False, "--remove", help="Strip the section and exit."),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Print the section, write nothing."),
+) -> None:
+    """Write the repository map into CLAUDE.md.
+
+    Measured on flask, this delivery costs about a fifth of what the
+    UserPromptSubmit hook costs for an identical payload — CLAUDE.md rides the
+    prefix Claude Code already caches. See bench/README.md.
+    """
+    from .core.delivery import remove_map, render_section, write_map
+    from .core.hook import HookConfig, build_map
+
+    root = Path.cwd()
+
+    if remove:
+        result = remove_map(root)
+        if result.action == "removed":
+            console.print(
+                f"[cslim.ok]✔[/] [cslim.text]map removed from[/] "
+                f"[cslim.path]{escape(str(result.path))}[/]"
+            )
+        else:
+            console.print("[cslim.dim]○ no cslim map in CLAUDE.md[/]")
+        raise typer.Exit()
+
+    config = HookConfig(
+        paths=tuple(paths) if paths else (),
+        max_tokens=max_tokens,
+        aggressive=aggressive,
+        model=model,
+        languages=_tuple(lang),
+        index_only=index_only,
+        index_threshold=index_threshold,
+        min_files=0,  # an explicit `cslim map` is a decision, not a heuristic
+    )
+    try:
+        payload, tokens, files, _cached, tier_index = build_map(config, root)
+    except Exception as exc:
+        _fail(f"could not build the map: {type(exc).__name__}: {exc}")
+        return
+    if not payload:
+        _fail(f"no source files found under {root}")
+        return
+
+    if dry_run:
+        sys.stdout.write(render_section(payload) + "\n")
+        raise typer.Exit()
+
+    result = write_map(payload, project_dir=root, tokens=tokens, files=files)
+    if result.action == "absent":
+        _fail("; ".join(result.warnings) or "could not write CLAUDE.md")
+        return
+
+    tier = "index" if tier_index else "skeleton"
+    verb = {"created": "written to", "updated": "refreshed in", "unchanged": "already current in"}
+    mark = "○" if result.action == "unchanged" else "✔"
+    console.print(
+        f"[cslim.ok]{mark}[/] [cslim.text]{tier} map ({humanize(tokens)} tokens, "
+        f"{files} files) {verb[result.action]}[/] [cslim.path]{escape(str(result.path))}[/]"
+    )
+    for warning in result.warnings:
+        for line in warning.splitlines():
+            console.print(f"  [cslim.warn]![/] [cslim.dim]{escape(line)}[/]" if line.strip()
+                          and not line.startswith("    ") else f"    [cslim.accent]{escape(line.strip())}[/]")
+    console.print(
+        "  [cslim.dim]refresh it when the architecture changes — not on a timer:\n"
+        "    rewriting CLAUDE.md changes the cached prefix that makes this cheap.[/]"
+    )
+
+
 @app.command()
 def install(
     scope: str = typer.Option(
@@ -803,13 +884,47 @@ def install(
         help="Force a tier. Default: chosen per repository size.",
     ),
     index_threshold: int = typer.Option(30, "--index-threshold"),
+    delivery: str = typer.Option(
+        "hook", "--delivery", "-d",
+        help="hook | claude-md | none. claude-md measured ~5x cheaper than hook.",
+    ),
     quiet: bool = typer.Option(False, "--quiet", "-q"),
 ) -> None:
-    """Register cslim as a Claude Code hook (automatic mode)."""
-    from .core.installer import InstallScope, hook_command, install_hook
+    """Set up automatic mode, choosing how the map reaches Claude."""
+    from .core.delivery import DeliveryMode, remove_map
+    from .core.installer import InstallScope, hook_command, install_hook, uninstall_hook
 
     if scope not in (InstallScope.PROJECT, InstallScope.LOCAL, InstallScope.USER):
         _fail("--scope must be one of: project, local, user")
+    try:
+        mode = DeliveryMode(delivery)
+    except ValueError:
+        _fail("--delivery must be one of: hook, claude-md, none")
+        return
+
+    if mode is DeliveryMode.NONE:
+        hook_result = uninstall_hook(scope)
+        map_result = remove_map(Path.cwd())
+        console.print(
+            f"[cslim.ok]✔[/] [cslim.text]delivery disabled[/] [cslim.dim]— hook "
+            f"{hook_result.action}, CLAUDE.md map {map_result.action}[/]"
+        )
+        raise typer.Exit()
+
+    if mode is DeliveryMode.CLAUDE_MD:
+        # Two live deliveries would inject the map twice and pay for it twice,
+        # so adopting claude-md retires the hook rather than stacking on it.
+        removed = uninstall_hook(scope)
+        if removed.action == "removed":
+            console.print("[cslim.dim]○ removed the UserPromptSubmit hook (delivery moved)[/]")
+        console.print(
+            "  [cslim.dim]now run[/] [cslim.accent]cslim map[/] "
+            "[cslim.dim]to write it, and again when the architecture changes.[/]\n"
+            "  [cslim.dim]measured on flask: +36% vs no map, against +176% "
+            "through the hook (bench/README.md).[/]"
+        )
+        raise typer.Exit()
+
     command = hook_command(
         paths=tuple(str(p) for p in (path or ())),
         max_tokens=max_tokens,

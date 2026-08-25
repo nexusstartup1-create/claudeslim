@@ -1,0 +1,255 @@
+"""Where the map is delivered — and why that decides what it costs.
+
+``bench/inject_probe.py`` measured the same 5,026-token payload arriving two
+ways: through the ``UserPromptSubmit`` hook it cost **+176%** against no map,
+through ``CLAUDE.md`` **+36%** — a gap of 6.9× the run-to-run spread. The reason
+is cache mechanics, not content: ``additionalContext`` is inserted per session
+and invalidates a cache boundary, forcing a ~14k block rewrite whatever the
+payload size, while ``CLAUDE.md`` sits in the stable prefix Claude Code already
+caches and adds no measurable cache write at all.
+
+That result drives two decisions in this module.
+
+**The map is written, not injected.** Delivery is a file edit, so it costs
+nothing at all until Claude reads it as part of a prefix it was going to read
+anyway.
+
+**Nothing here refreshes the file on a timer.** Rewriting ``CLAUDE.md`` changes
+the cached prefix, which is precisely the asset that makes this delivery cheap;
+doing it between turns would reintroduce the cost the hook was measured to have.
+The map is refreshed when the caller asks (``cslim map``) or at session start,
+never mid-session.
+
+It is still not free: +36% against no map at all on Flask, a repository Claude
+can already explore cheaply. Whether it wins on a repo where exploration is
+genuinely expensive is open, and `bench/README.md` says so.
+"""
+
+from __future__ import annotations
+
+import subprocess
+from dataclasses import dataclass, field
+from enum import Enum
+from pathlib import Path
+from typing import Literal
+
+__all__ = [
+    "BEGIN_MARKER",
+    "END_MARKER",
+    "DeliveryMode",
+    "GitState",
+    "MapAction",
+    "MapWriteResult",
+    "claude_md_path",
+    "git_state",
+    "read_section",
+    "remove_map",
+    "render_section",
+    "write_map",
+]
+
+#: HTML comments: invisible when the markdown renders, stable to grep for, and
+#: legal anywhere in the file.
+BEGIN_MARKER = "<!-- BEGIN cslim map -->"
+END_MARKER = "<!-- END cslim map -->"
+
+CLAUDE_MD = "CLAUDE.md"
+
+
+class DeliveryMode(str, Enum):
+    HOOK = "hook"
+    """Inject through UserPromptSubmit. Measured +176% on Flask."""
+    CLAUDE_MD = "claude-md"
+    """Write into CLAUDE.md. Measured +36% on the same payload."""
+    NONE = "none"
+    """Deliver nothing. Measured cheapest in every condition tested."""
+
+
+GitState = Literal["tracked", "ignored", "untracked", "no-git"]
+MapAction = Literal["created", "updated", "unchanged", "removed", "absent"]
+
+
+@dataclass(slots=True)
+class MapWriteResult:
+    """What happened to CLAUDE.md, for the CLI to report and tests to assert."""
+
+    path: Path
+    action: MapAction
+    tokens: int = 0
+    files: int = 0
+    git: GitState = "no-git"
+    warnings: list[str] = field(default_factory=list)
+
+    @property
+    def changed(self) -> bool:
+        return self.action in ("created", "updated", "removed")
+
+
+def claude_md_path(project_dir: Path | None = None) -> Path:
+    return (project_dir or Path.cwd()) / CLAUDE_MD
+
+
+# --------------------------------------------------------------------------- #
+# git hazards
+# --------------------------------------------------------------------------- #
+
+
+def _git(args: list[str], cwd: Path) -> tuple[int, str]:
+    try:
+        proc = subprocess.run(
+            ["git", *args], cwd=str(cwd), capture_output=True, text=True, check=False
+        )
+    except (OSError, ValueError):
+        return 1, ""
+    return proc.returncode, proc.stdout.strip()
+
+
+def git_state(path: Path) -> GitState:
+    """Is CLAUDE.md tracked, ignored, or neither?
+
+    This decides whether writing a generated map into the file is harmless or
+    turns every regeneration into diff noise for the whole team.
+    """
+    cwd = path.parent
+    code, _ = _git(["rev-parse", "--is-inside-work-tree"], cwd)
+    if code != 0:
+        return "no-git"
+    if _git(["check-ignore", "-q", path.name], cwd)[0] == 0:
+        return "ignored"
+    if _git(["ls-files", "--error-unmatch", path.name], cwd)[0] == 0:
+        return "tracked"
+    return "untracked"
+
+
+def _git_warnings(state: GitState, path: Path) -> list[str]:
+    if state == "tracked":
+        return [
+            f"{path.name} is committed to git: every map refresh will show up in "
+            "diffs and reviews. To keep it local:\n"
+            f"    git rm --cached {path.name} && echo '{path.name}' >> .gitignore",
+        ]
+    if state == "untracked":
+        return [
+            f"{path.name} is not in git yet. Add it to .gitignore first if you "
+            "would rather the map stayed on your machine:\n"
+            f"    echo '{path.name}' >> .gitignore",
+        ]
+    return []
+
+
+# --------------------------------------------------------------------------- #
+# section rendering and splicing
+# --------------------------------------------------------------------------- #
+
+_HEADER = (
+    "## Repository map (generated by cslim)\n\n"
+    "Function bodies are elided; signatures, types, class hierarchies and\n"
+    "imports are verbatim. Use it to locate code instead of exploring the tree,\n"
+    "then read in full only the files you actually need.\n\n"
+    "Regenerate with `cslim map`. Everything between the markers is overwritten,\n"
+    "so do not edit inside them.\n"
+)
+
+
+def render_section(map_text: str) -> str:
+    """The complete marker-delimited block, including both markers."""
+    body = map_text.strip("\n")
+    return f"{BEGIN_MARKER}\n{_HEADER}\n{body}\n{END_MARKER}"
+
+
+def read_section(text: str) -> str | None:
+    """The current block including markers, or None when absent."""
+    start = text.find(BEGIN_MARKER)
+    if start == -1:
+        return None
+    end = text.find(END_MARKER, start)
+    if end == -1:
+        return None
+    return text[start : end + len(END_MARKER)]
+
+
+def _splice(existing: str, section: str) -> str:
+    """Replace the block in place, or append it, touching nothing else."""
+    current = read_section(existing)
+    if current is not None:
+        return existing.replace(current, section, 1)
+    separator = "" if not existing or existing.endswith("\n\n") else (
+        "\n" if existing.endswith("\n") else "\n\n"
+    )
+    return f"{existing}{separator}{section}\n"
+
+
+# --------------------------------------------------------------------------- #
+# the operations
+# --------------------------------------------------------------------------- #
+
+
+def write_map(
+    map_text: str,
+    *,
+    project_dir: Path | None = None,
+    tokens: int = 0,
+    files: int = 0,
+) -> MapWriteResult:
+    """Write or refresh the map section in CLAUDE.md.
+
+    Never touches a byte outside the markers, and rewrites nothing when the
+    content is unchanged — an identical rewrite would still bump the mtime and,
+    worse, dirty a file whose whole value here is being a *stable* cached prefix.
+    """
+    path = claude_md_path(project_dir)
+    state = git_state(path)
+    warnings = _git_warnings(state, path)
+    section = render_section(map_text)
+
+    existing = ""
+    if path.is_file():
+        try:
+            existing = path.read_text(encoding="utf-8")
+        except OSError as exc:
+            return MapWriteResult(path, "absent", tokens, files, state, [f"{path}: {exc}"])
+
+    if read_section(existing) == section:
+        return MapWriteResult(path, "unchanged", tokens, files, state, warnings)
+
+    updated = _splice(existing, section)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(updated, encoding="utf-8")
+    except OSError as exc:
+        return MapWriteResult(path, "absent", tokens, files, state, [f"{path}: {exc}"])
+
+    action: MapAction = "created" if not existing else "updated"
+    return MapWriteResult(path, action, tokens, files, state, warnings)
+
+
+def remove_map(project_dir: Path | None = None) -> MapWriteResult:
+    """Strip the map section, leaving the rest of CLAUDE.md exactly as it was."""
+    path = claude_md_path(project_dir)
+    if not path.is_file():
+        return MapWriteResult(path, "absent")
+    state = git_state(path)
+    try:
+        existing = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        return MapWriteResult(path, "absent", git=state, warnings=[f"{path}: {exc}"])
+
+    section = read_section(existing)
+    if section is None:
+        return MapWriteResult(path, "absent", git=state)
+
+    remainder = existing.replace(section, "", 1)
+    # collapse the blank run the removal leaves behind, but keep the file's shape
+    while "\n\n\n" in remainder:
+        remainder = remainder.replace("\n\n\n", "\n\n")
+    remainder = remainder.strip("\n")
+
+    try:
+        if remainder:
+            path.write_text(remainder + "\n", encoding="utf-8")
+        else:
+            # the file existed only to carry our section
+            path.unlink()
+    except OSError as exc:
+        return MapWriteResult(path, "absent", git=state, warnings=[f"{path}: {exc}"])
+    return MapWriteResult(path, "removed", git=state)
