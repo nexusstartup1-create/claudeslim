@@ -35,3 +35,7 @@ Thumbs.db
 
 # source archive for the 3D model (the processed .glb is committed instead)
 *.rar
+
+# the marketing site lives here but is deployed straight to Vercel,
+# not through this repository
+docs/
