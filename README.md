@@ -171,8 +171,10 @@ cslim . --index-only | claude -p "where does authentication happen?"
 **Register the hook to inject a map automatically, once per session:**
 
 ```bash
-cslim install
-cslim uninstall     # removes only our entry, leaves other hooks alone
+cslim install                        # UserPromptSubmit hook — measured +176% delivery
+cslim install --delivery claude-md   # the cheaper mechanism — measured +36%
+cslim install --delivery none        # remove whichever is active
+cslim uninstall                      # removes only our entry, leaves other hooks alone
 ```
 
 `cslim install` prints a warning telling you what it costs. Read
@@ -240,10 +242,31 @@ the content being cache-read each turn at 0.1×.
 not inherent to giving Claude a map — it is specific to the mechanism cslim
 currently uses. The same map through `CLAUDE.md` costs about a fifth.
 
-> **Not implemented.** cslim does not yet deliver maps this way, because doing
-> so writes into your repository rather than your cache directory — a different
-> trade-off from the hook, which writes nothing. See
-> [Security](#security).
+> **Implemented, not yet benchmarked end to end.**
+>
+> ```bash
+> cslim install --delivery claude-md   # retires the hook, so you never pay twice
+> cslim map                            # write it, and again when the architecture changes
+> cslim map --remove                   # take it back out
+> ```
+>
+> `cslim map` writes a section delimited by `<!-- BEGIN cslim map -->` markers,
+> splices it in place on refresh, and never touches a byte outside them. An
+> unchanged map is not rewritten at all — an identical rewrite would still dirty
+> the stable prefix that makes this delivery cheap. Nothing refreshes it on a
+> timer for the same reason.
+>
+> It writes into your repository rather than your cache directory, which is a
+> different trade-off from the hook. `cslim map` tells you which case you are in:
+> `CLAUDE.md` tracked by git (every refresh lands in diffs), untracked, or
+> gitignored — the clean case.
+>
+> **The +36% above is `inject_probe`, a single-turn synthetic payload.** No
+> multi-turn A/B has been run against this delivery yet. `bench/ab.py` now has
+> `CLAUDE.md · full AST` and `CLAUDE.md · index` arms, and every arm tears down
+> both mechanisms before building its own. Until that run exists, treat
+> claude-md as *measured cheaper than the hook*, not as *measured to beat
+> sending nothing*.
 
 ### Which mode to use
 
