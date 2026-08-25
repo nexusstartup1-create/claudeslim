@@ -137,11 +137,17 @@ An index line answers *which file*, a skeleton answers *what is the signature*.
 Between them sits *what does this module contain*, which is the question you
 actually ask while orienting.
 
-| tier | flask (80 files) | vs source |
-| --- | --- | --- |
-| `--index-only` | 2,817 tokens | −98.1% |
-| **`--outline`** | **6,187 tokens** | **−95.7%** |
-| full skeleton | 32,176 tokens | −77.8% |
+| tier | flask (80 files) | vs source | measured cost |
+| --- | --- | --- | --- |
+| `--index-only` | 2,817 tokens | −98.1% | +1.9%, p=0.505 |
+| **`--outline`** | **6,187 tokens** | **−95.7%** | −13.8%, p=0.279 |
+| full skeleton | 32,176 tokens | −77.8% | +6.8%, p=0.028 |
+
+Cost is the median over 8 sessions of 12 turns, delivered through `CLAUDE.md`,
+against a no-map control. **Neither of the two cheap tiers is distinguishable
+from sending no map at all** — the outline's extra 3,257 tokens do not show up
+in the bill, so the more informative tier is not the dearer one. Only the full
+skeleton separates from the control, and by 6.8%.
 
 Environment variables are extracted from the **source**, not the skeleton —
 `os.environ[...]` lives inside a function body, which is exactly what a skeleton

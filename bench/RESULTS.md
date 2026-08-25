@@ -38,6 +38,46 @@ refuses to call anything smaller an effect, in either direction.
 
 ## Our runs
 
+### The OUTLINE tier — flask · 12 turns · 8 sessions/arm
+
+`cslim` 0.1.0 · 2026-08-26 · [run4.json](run4.json)
+
+Does the middle tier's extra content show up in the bill?
+
+| arm | map tokens | total tokens | cache write | median $/session | vs control | p (rank) |
+| --- | --- | --- | --- | --- | --- | --- |
+| no map | — | 164,035 | 3,989 | $0.1493 | — | — |
+| CLAUDE.md · index | 3,323 | 178,896 | 8,254 | $0.1522 | +1.9% | 0.505 |
+| CLAUDE.md · outline | 6,580 | 159,492 | 5,989 | $0.1287 | −13.8% | 0.279 |
+
+**Verdict: no measurable difference.** Both tiers sit inside the spread and
+neither rank test comes close to significance. The −13.8% is not a result.
+
+What the run does support: **the outline's extra 3,257 tokens do not show up as
+cost.** There are now two tiers a session cannot distinguish from sending
+nothing, and the more informative one is not the dearer one.
+
+Per-session costs:
+
+| arm | sessions |
+| --- | --- |
+| no map | 0.113 0.132 0.142 0.147 0.151 0.151 0.169 0.172 |
+| CLAUDE.md · index | 0.132 0.137 0.143 0.146 0.159 0.174 **0.320 0.338** |
+| CLAUDE.md · outline | 0.093 0.122 0.124 0.128 0.130 0.134 0.169 **0.363** |
+
+Two unexplained things, recorded rather than smoothed over:
+
+**The outline arm carried fewer total tokens than the control** (159,492 vs
+164,035) — the only CLAUDE.md arm in this file to displace exploration rather
+than add to it. One run, so it is an observation, not a finding.
+
+**The smaller map wrote more cache.** Index is 3,323 tokens and wrote 8,254;
+outline is 6,580 and wrote 5,989. That is backwards for any size-driven story,
+and consistent with `cache_probe`'s conclusion that injection cost is not
+about payload size. We still cannot say what it *is* about.
+
+Run cost: 24 sessions, ~$4.
+
 ### cslim vs repomix — flask · 12 turns · 8 sessions/arm
 
 `cslim` 0.1.0 · repomix 1.18.0 · 2026-08-26 · [run3.json](run3.json)

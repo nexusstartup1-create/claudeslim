@@ -299,6 +299,7 @@ ARMS: dict[str, dict[str, object] | None] = {
     "hook · index": {"delivery": "hook", "index_only": True},
     "CLAUDE.md · full AST": {"delivery": "claude-md", "index_only": False},
     "CLAUDE.md · index": {"delivery": "claude-md", "index_only": True},
+    "CLAUDE.md · outline": {"delivery": "claude-md", "outline_only": True},
 }
 
 
@@ -333,6 +334,7 @@ def set_arm(spec: dict[str, object] | None, project: Path, max_tokens: int) -> N
             max_tokens=max_tokens,
             min_files=0,
             index_only=bool(options.get("index_only", False)),
+            outline_only=bool(options.get("outline_only", False)),
         )
         payload, tokens, files, _cached, _tier = build_map(config, project)
         if not payload:

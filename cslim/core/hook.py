@@ -64,6 +64,8 @@ class HookConfig:
     """
     index_threshold: int = 30
     """At or below this many files, prefer the ultralight index."""
+    outline_only: bool = False
+    """Force the middle tier: grouped names, no signatures."""
 
 
 @dataclass(slots=True)
@@ -144,6 +146,7 @@ def _fingerprint(
             config.model,
             sorted(config.languages),
             index_only,
+            config.outline_only,
         ],
         "files": files,
     }
@@ -213,7 +216,9 @@ def build_map(config: HookConfig, cwd: Path) -> tuple[str, int, int, bool, bool]
             continue
         stamps.append((item.rel_path, int(stat.st_mtime), stat.st_size))
 
-    index_only = choose_tier(config, len(discovered))
+    # An explicit --outline is a decision; the automatic tier choice is a
+    # heuristic. The decision wins.
+    index_only = False if config.outline_only else choose_tier(config, len(discovered))
     fingerprint = _fingerprint(config, stamps, index_only=index_only)
     cache_file = _cache_path(fingerprint)
     if cache_file.is_file():
@@ -230,6 +235,7 @@ def build_map(config: HookConfig, cwd: Path) -> tuple[str, int, int, bool, bool]
         discovery=discovery,
         compression=CompressionOptions(aggressive=config.aggressive),
         render=RenderOptions(format="md", tree=False),
+        outline_only=config.outline_only,
         model=config.model,
         max_tokens=config.max_tokens,
         index_only=index_only,
