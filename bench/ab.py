@@ -231,6 +231,25 @@ class Arm:
         values = self.totals(attr)
         return statistics.fmean(values) if values else 0.0
 
+    def median(self, attr: str) -> float:
+        values = self.totals(attr)
+        return statistics.median(values) if values else 0.0
+
+    def robust_spread(self, attr: str) -> float:
+        """Median absolute deviation, scaled to compare with a stdev.
+
+        The standard deviation is what made two runs inconclusive: one session
+        four times its siblings inflates it enough to swallow every effect. MAD
+        ignores that session instead of being dominated by it, and 1.4826 is the
+        factor that makes it estimate the same quantity for normal data — so the
+        two are directly comparable rather than a different scale.
+        """
+        values = self.totals(attr)
+        if len(values) < 2:
+            return 0.0
+        med = statistics.median(values)
+        return 1.4826 * statistics.median([abs(v - med) for v in values])
+
     def stdev(self, attr: str) -> float:
         values = self.totals(attr)
         return statistics.stdev(values) if len(values) > 1 else 0.0
@@ -442,6 +461,32 @@ def report_arms(arms: list[Arm], turns: int) -> None:
 
     print(f"\n  control spread (± stdev): ${control.stdev('cost_usd'):.4f}")
     spread = max((a.stdev("cost_usd") for a in arms if a.ok), default=0.0)
+
+    # Both estimators, always, never one swapped for the other.
+    #
+    # Two runs came out inconclusive on the stdev rule because a single session
+    # costing four times its siblings inflates it enough to swallow every
+    # effect. The median absolute deviation ignores that session rather than
+    # being dominated by it. On demonstrably bimodal data it is the right
+    # estimator — but it was adopted after seeing data it would flip, so this
+    # prints both and lets the reader see that the verdict depends on which one
+    # you trust. When they disagree, that disagreement is the finding.
+    robust = max((a.robust_spread("cost_usd") for a in arms if a.ok), default=0.0)
+    base_median = control.median("cost_usd")
+    print(f"  control spread (± MAD):   ${control.robust_spread('cost_usd'):.4f}")
+    if robust and abs(robust - spread) / max(robust, spread) > 0.25:
+        print("\n  ROBUST VIEW — medians, and spread as scaled MAD:")
+        print(f"    run-to-run spread: ${robust:.4f}  (stdev said ${spread:.4f})")
+        for a in arms[1:]:
+            if not a.ok:
+                continue
+            gap = a.median("cost_usd") - base_median
+            mark = "exceeds" if abs(gap) > robust else "within"
+            pct = (gap / base_median * 100) if base_median else 0.0
+            print(f"    {a.name:22} median ${a.median('cost_usd'):.4f} "
+                  f"({pct:+.1f}%)  {mark} the spread")
+        print("    The two views disagree because one arm is bimodal, not noisy.")
+        print("    Treat neither as a significance test: see bench/RESULTS.md.")
 
     print()
     winners = [a for a in arms[1:] if a.ok and a.mean("cost_usd") < base_cost]

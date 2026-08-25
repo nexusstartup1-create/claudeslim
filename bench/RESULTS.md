@@ -82,6 +82,36 @@ The opposite is also worth recording: `hook · full AST` is the steadiest arm on
 the board (stdev $0.018), and its cheapest session, $0.252, is dearer than five
 of the six control sessions.
 
+#### The statistic was the problem, not the sample size
+
+The verdict above uses the mean and a standard deviation. Both are wrecked by a
+single session costing four times its siblings. Recomputed with the median and
+a scaled median absolute deviation — the estimators for demonstrably bimodal
+data:
+
+| arm | median | vs control | vs robust spread |
+| --- | --- | --- | --- |
+| no map | $0.1537 | — | — |
+| hook · full AST | $0.2798 | **+82.0%** | **exceeds** ($0.126 gap vs $0.045) |
+| CLAUDE.md · full AST | $0.1905 | +23.9% | within |
+| CLAUDE.md · index | $0.1436 | −6.5% | within |
+
+Run-to-run spread: $0.2594 by stdev, **$0.0451 by MAD**.
+
+So on the robust view there *is* a result: **the hook costs measurably more,
+and neither CLAUDE.md arm is distinguishable from sending no map at all.** That
+agrees with `inject_probe` (hook +176%, CLAUDE.md +36%), with the cache-write
+replication below, and with the cost model in `cslim/core/costmodel.py`.
+
+> **Read this before quoting the robust view.** The estimator was changed after
+> seeing data it would flip. That is the manoeuvre that manufactures findings,
+> and the justification — the distribution is visibly bimodal in the raw
+> per-session numbers, and MAD is the standard estimator for that — does not
+> erase the fact that it was chosen afterwards. The rank test, which was chosen
+> before and is already robust, puts the hook at **p=0.065**: closest, still
+> short of conventional significance. `bench/ab.py` now prints both views and
+> never swaps one for the other, so the disagreement stays visible.
+
 #### The one thing that replicated
 
 Cache write, across two independent runs:
