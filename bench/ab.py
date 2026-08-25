@@ -339,6 +339,12 @@ def main() -> int:
         "--hook-max-tokens", type=int, default=25_000,
         help="Token budget given to the hook; lower means a cheaper injection.",
     )
+    parser.add_argument(
+        "--arms",
+        default="",
+        help="Comma-separated arm names to run (default: all). --list-arms shows them.",
+    )
+    parser.add_argument("--list-arms", action="store_true", help="Print arm names and exit.")
     parser.add_argument("--yes", action="store_true", help="Skip the cost confirmation.")
     args = parser.parse_args()
 
@@ -349,7 +355,22 @@ def main() -> int:
     pool = FLASK_TASKS if args.task_set == "flask" else DEFAULT_TASKS
     tasks = pool[: max(1, args.tasks)]
     sessions_per_arm = args.repeats if args.turns > 1 else args.repeats * len(tasks)
-    total_calls = sessions_per_arm * len(ARMS) * (args.turns if args.turns > 1 else 1)
+    if args.list_arms:
+        for name in ARMS:
+            print(name)
+        return 0
+
+    selected = dict(ARMS)
+    if args.arms:
+        wanted = [a.strip() for a in args.arms.split(",") if a.strip()]
+        unknown = [a for a in wanted if a not in ARMS]
+        if unknown:
+            print(f"unknown arm(s): {', '.join(unknown)}", file=sys.stderr)
+            print(f"available: {', '.join(ARMS)}", file=sys.stderr)
+            return 2
+        selected = {name: ARMS[name] for name in wanted}
+
+    total_calls = sessions_per_arm * len(selected) * (args.turns if args.turns > 1 else 1)
 
     print(f"About to make ~{total_calls} real Claude Code calls on your account.")
     print("At roughly $0.15-0.60 each, expect a few dollars.\n")
@@ -361,11 +382,11 @@ def main() -> int:
     settings = settings_path(InstallScope.PROJECT, args.project)
     backup = settings.read_text(encoding="utf-8") if settings.is_file() else None
 
-    arms = {name: Arm(name) for name in ARMS}
+    arms = {name: Arm(name) for name in selected}
     try:
         for repeat in range(args.repeats):
             # Interleave arms so prompt-cache warming doesn't favour one side.
-            for name, spec in ARMS.items():
+            for name, spec in selected.items():
                 set_arm(spec, args.project, args.hook_max_tokens)
                 target = arms[name]
                 if args.turns > 1:

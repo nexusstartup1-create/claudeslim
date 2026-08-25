@@ -261,12 +261,32 @@ currently uses. The same map through `CLAUDE.md` costs about a fifth.
 > `CLAUDE.md` tracked by git (every refresh lands in diffs), untracked, or
 > gitignored — the clean case.
 >
-> **The +36% above is `inject_probe`, a single-turn synthetic payload.** No
-> multi-turn A/B has been run against this delivery yet. `bench/ab.py` now has
-> `CLAUDE.md · full AST` and `CLAUDE.md · index` arms, and every arm tears down
-> both mechanisms before building its own. Until that run exists, treat
-> claude-md as *measured cheaper than the hook*, not as *measured to beat
-> sending nothing*.
+> **The multi-turn A/B has now been run, and it is inconclusive.**
+>
+> Flask, 12 turns, 3 sessions per arm, five arms:
+>
+> | arm | cache write | cost / session | vs control |
+> | --- | --- | --- | --- |
+> | no map | 14,044 | $0.2436 | — |
+> | hook · full AST | 20,342 | $0.2953 | +21.2% |
+> | hook · index | 18,785 | $0.3021 | +24.0% |
+> | CLAUDE.md · full AST | 20,353 | $0.3423 | +40.5% |
+> | CLAUDE.md · index | **9,518** | $0.2049 | −15.9% |
+>
+> Run-to-run spread $0.3013 — every arm lands inside it, so **none of those
+> percentages is a result.** Not the −15.9% we would like to quote, and not the
+> +40.5% either: one session in that arm cost $0.69 against $0.168 for its two
+> siblings, and that single outlier is the whole number.
+>
+> The one thing worth noting is not a cost: `CLAUDE.md · index` is the only arm
+> whose cache write came in *below* the control, which is what you would expect
+> if CLAUDE.md rides a prefix that was cached anyway. The other CLAUDE.md arm
+> did not reproduce it.
+>
+> So the +36% from `inject_probe` — single-turn, synthetic — is still the only
+> measurement of this delivery with an effect above its noise. The honest claim
+> remains *measured cheaper than the hook*, not *measured to beat sending
+> nothing*. See [Benchmarks](#benchmarks) for the per-session numbers.
 
 ### Which mode to use
 

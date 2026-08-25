@@ -133,6 +133,60 @@ It is still not free: +36% against no map at all. And it moves cslim's output
 into the user's repository, where it would be committed to git — a different
 security posture from the hook, which writes nothing.
 
+### CLAUDE.md delivery, end to end — pallets/flask, 12 turns
+
+`inject_probe` measured a synthetic payload in a single turn. This is the real
+map, twelve turns, and the arms the delivery question actually needs. Every arm
+tears down both delivery mechanisms before building its own, so no arm measures
+itself plus its predecessor.
+
+3 sessions per arm, 12 turns each, 5 arms.
+
+| arm | tokens | cache write | cost / session | vs control |
+| --- | --- | --- | --- | --- |
+| no map | 171,604 | 14,044 | $0.2436 | — |
+| hook · full AST | 150,689 | 20,342 | $0.2953 | +21.2% |
+| hook · index | 189,180 | 18,785 | $0.3021 | +24.0% |
+| CLAUDE.md · full AST | 257,626 | 20,353 | $0.3423 | +40.5% |
+| CLAUDE.md · index | 182,278 | 9,518 | $0.2049 | −15.9% |
+
+> **VERDICT: NO MEASURABLE DIFFERENCE.** Run-to-run spread $0.3013; every arm
+> lands inside it. **None of those percentages is a result** — not the −15.9%
+> we would like to quote, and not the +40.5% either.
+
+The per-session costs show why, and they are more useful than the means:
+
+| arm | run 1 | run 2 | run 3 |
+| --- | --- | --- | --- |
+| no map | $0.3065 | $0.2610 | $0.1634 |
+| hook · full AST | $0.3144 | $0.2991 | $0.2725 |
+| hook · index | $0.2911 | $0.3205 | $0.2946 |
+| CLAUDE.md · full AST | **$0.6901** | $0.1683 | $0.1684 |
+| CLAUDE.md · index | $0.3266 | $0.1378 | $0.1503 |
+
+`CLAUDE.md · full AST` ran $0.69 once and $0.168 twice. That single session —
+four times its siblings — is the entire +40.5%. Drop it and the arm is the
+cheapest on the board; keep it and the arm looks worst. Three samples cannot
+tell those two stories apart, which is precisely what the verdict says. The
+control is not steady either: $0.3065 down to $0.1634, a 1.9× range with no
+intervention at all.
+
+**The one signal worth noting** is not a cost. `CLAUDE.md · index` wrote 9,518
+cache tokens against the control's 14,044 — the only arm *below* the control,
+and consistent with the claim that CLAUDE.md rides a prefix that is cached
+anyway. `CLAUDE.md · full AST` did not reproduce it (20,353). One of two arms is
+a hint, not a finding.
+
+**What this does and does not change.** `inject_probe` remains the only
+measurement of this delivery with an effect above its noise, and it was a
+single-turn synthetic payload. The honest claim stays *measured cheaper than
+the hook*, not *measured to beat sending nothing*. Escaping the noise needs
+roughly 6–8 repeats per arm rather than 3.
+
+*Run cost: 15 sessions, ~$4.16. The `--arms` filter was silently ineffective
+(a variable collision), so all five arms ran instead of the three intended;
+fixed, and the fix is verified.*
+
 ---
 
 ## Recommendations
