@@ -236,6 +236,39 @@ cslim uninstall                      # removes only our entry, leaves other hook
 
 ---
 
+## Measured against another tool
+
+The first cost A/B in this category against a competitor. Both maps spliced
+into `CLAUDE.md`, same delivery, same file scope (flask's `**/*.py`), 8 sessions
+per arm, 12 turns:
+
+| map | tokens | cost/session | vs control | p (rank) |
+| --- | --- | --- | --- | --- |
+| none | — | $0.1575 | — | — |
+| cslim `--index-only` | 3,093 | $0.1672 | +6.2% | 0.798 |
+| cslim full AST | 33,895 | $0.1682 | +6.8% | 0.028 |
+| [repomix](https://github.com/yamadashy/repomix) `--compress` | 86,880 | $0.3442 | **+118.5%** | 0.0002 |
+
+**cslim's index tier is free** — p=0.798, a session cannot tell it from no map
+at all, and you get a line per file for all 80 files.
+
+**repomix is not being tested as designed**, and that matters: it packs a repo
+for one-shot consumption, not for a prefix re-read every turn. The +118.5% is
+what 86,880 tokens cost when they are re-read twelve times. Used as intended, in
+one turn, that cost is paid once and this result does not apply.
+
+What the run does establish is the *shape* a persistent map needs — a locator,
+not an archive — which is delivery mechanics both tools are subject to. On
+compression density cslim is 2.6× denser per file, and that is a separate claim
+resting on token counts, not on this benchmark.
+
+Reproduce it, or point it at a tool we did not test:
+
+```bash
+python bench/ab.py --project /path/to/repo --turns 12 --repeats 8 \
+                   --compare-map "theirs=/tmp/their-output.md" --json run.json
+```
+
 ## Prompt caching math
 
 Anthropic bills a **cache write at ~1.25×** base input and a **cache read at

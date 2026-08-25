@@ -38,6 +38,62 @@ refuses to call anything smaller an effect, in either direction.
 
 ## Our runs
 
+### cslim vs repomix — flask · 12 turns · 8 sessions/arm
+
+`cslim` 0.1.0 · repomix 1.18.0 · 2026-08-26 · [run3.json](run3.json)
+
+The first cost A/B in this category against another tool. Both maps are
+delivered the same way — spliced into `CLAUDE.md` — so the only variable is
+what the map contains, not how it arrives.
+
+Same scope for both: flask's `**/*.py`.
+
+| map | tokens | per file | cost/session (median) | vs control | p (rank) |
+| --- | --- | --- | --- | --- | --- |
+| none | — | — | $0.1575 | — | — |
+| cslim `--index-only` | 3,093 | 39 | $0.1672 | +6.2% | 0.798 |
+| cslim full AST | 33,895 | 424 | $0.1682 | +6.8% | **0.028** |
+| repomix `--compress` | 86,880 | 1,034 | $0.3442 | **+118.5%** | **0.0002** |
+
+Exact two-tailed Mann-Whitney against the control, n=8 per arm. Per-session
+costs, sorted:
+
+| arm | sessions |
+| --- | --- |
+| no map | 0.124 0.134 0.143 0.156 0.159 0.161 0.167 0.184 |
+| cslim index | 0.099 0.119 0.138 0.159 0.175 0.177 0.178 0.303 |
+| cslim full AST | 0.162 0.165 0.166 0.167 0.169 0.175 0.177 0.207 |
+| repomix | 0.261 0.262 0.339 0.342 0.346 0.368 0.375 1.655 |
+
+**repomix's cheapest session cost more than the control's dearest.** The two
+distributions do not overlap at all, which is what p=0.0002 is describing.
+
+Two findings, and they point in different directions:
+
+**cslim's index tier is free.** p=0.798 — indistinguishable from sending no map.
+A one-line-per-file map of all 80 files, at no measurable cost. This is the
+first configuration in this file that a session cannot tell from the control.
+
+**A large map in a cached prefix costs linearly.** `CLAUDE.md` is re-read every
+turn, so 86,880 tokens are re-read every turn. The +118.5% is that arithmetic,
+not a defect in repomix's compression.
+
+> **This is not a fair test of repomix, and saying so matters.**
+>
+> repomix is built to pack a repository into one file for one-shot consumption
+> — you paste it, you ask, you are done. It is not built to sit in a
+> persistent prefix that is re-read on every turn, which is what we did to it.
+> Used as designed, in a single-turn session, its per-turn cost is paid once
+> and this result does not apply.
+>
+> What the run measures is **the shape a map needs for persistent delivery**: a
+> locator, not an archive. That is a statement about delivery mechanics, which
+> both tools are subject to, not about which tool compresses better. On
+> compression density cslim is 2.6× repomix per file, and that is a separate
+> claim resting on the token counts above, not on this benchmark.
+
+Run cost: 32 sessions, $7.91.
+
 ### flask · 80 files · 12 turns · 6 sessions/arm · 4 arms
 
 `cslim` 0.1.0 · task set `flask` · 2026-08-26 · [run2.json](run2.json)

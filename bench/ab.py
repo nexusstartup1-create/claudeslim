@@ -318,6 +318,16 @@ def set_arm(spec: dict[str, object] | None, project: Path, max_tokens: int) -> N
     options = dict(spec)
     delivery = str(options.pop("delivery", "hook"))
 
+    if delivery == "claude-md" and "file" in options:
+        # An externally produced map — repomix, code2prompt, anything that
+        # writes a file. Delivered through the same mechanism as ours, so the
+        # comparison is about what the map contains, not how it arrives.
+        payload = Path(str(options["file"])).read_text(encoding="utf-8", errors="replace")
+        result = write_map(payload, project_dir=project)
+        if result.action == "absent":
+            raise SystemExit("; ".join(result.warnings) or "could not write CLAUDE.md")
+        return
+
     if delivery == "claude-md":
         config = HookConfig(
             max_tokens=max_tokens,
@@ -549,6 +559,15 @@ def main() -> int:
     )
     parser.add_argument("--list-arms", action="store_true", help="Print arm names and exit.")
     parser.add_argument(
+        "--compare-map",
+        action="append",
+        default=[],
+        metavar="NAME=PATH",
+        help="Add an arm carrying a map produced by another tool, delivered "
+             "through CLAUDE.md like ours. Repeatable. Example: "
+             "--compare-map 'repomix=/tmp/repomix.md'",
+    )
+    parser.add_argument(
         "--json", dest="json_out", type=Path, default=None,
         help="Write a machine-readable result file (for bench/RESULTS.md).",
     )
@@ -583,6 +602,19 @@ def main() -> int:
             print(f"available: {', '.join(ARMS)}", file=sys.stderr)
             return 2
         selected = {name: ARMS[name] for name in wanted}
+
+    for spec in args.compare_map:
+        if "=" not in spec:
+            print(f"--compare-map wants NAME=PATH, got {spec!r}", file=sys.stderr)
+            return 2
+        name, _, path = spec.partition("=")
+        if not Path(path).is_file():
+            print(f"--compare-map: no such file: {path}", file=sys.stderr)
+            return 2
+        selected[f"CLAUDE.md · {name.strip()}"] = {
+            "delivery": "claude-md",
+            "file": path.strip(),
+        }
 
     total_calls = sessions_per_arm * len(selected) * (args.turns if args.turns > 1 else 1)
 
