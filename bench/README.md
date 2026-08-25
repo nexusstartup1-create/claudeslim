@@ -189,6 +189,22 @@ fixed, and the fix is verified.*
 
 ---
 
+## Adding your own run
+
+`--task-set auto` derives the questions from the repository under test, so this
+needs no per-repo setup:
+
+```bash
+python bench/ab.py --project /path/to/your/repo --turns 12 --repeats 5 \
+                   --json my-run.json
+```
+
+`--json` writes a machine-readable result carrying the design, the per-session
+costs, the spread and the verdict. [RESULTS.md](RESULTS.md) collects them,
+including runs that contradict everything above — those are the useful ones.
+
+`--arms` runs a subset; `--list-arms` prints the names.
+
 ## Recommendations
 
 | Situation | Use | Why |

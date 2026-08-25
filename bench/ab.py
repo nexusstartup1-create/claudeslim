@@ -19,13 +19,16 @@ from __future__ import annotations
 
 import argparse
 import json
+import random
 import shutil
 import statistics
 import subprocess
 import sys
 import time
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
@@ -58,6 +61,76 @@ METHOD & CAVEATS — read before quoting these numbers.
 """
 
 #: Questions that require locating code — the case a map is supposed to help.
+def generate_tasks(project: Path, count: int = 4, seed: int = 7) -> list[str]:
+    """Build lookup questions from the repository under test.
+
+    Hand-written task sets are why this harness only ran against two repos. The
+    questions here come from cslim's own reference ranking: the most-referenced
+    files, and a distinctive symbol defined in each. They are answerable by
+    reading the code and hard to answer without finding it first, which is the
+    exploration a map claims to replace.
+
+    Deterministic for a given repo and seed, so repeats and arms compare.
+    """
+    from cslim.core import SymbolKind, compress_paths
+
+    # Only things a file *defines*. Imports name symbols that live elsewhere, so
+    # asking "which file defines rich.box" has no answer in this repository.
+    definitions = {
+        SymbolKind.FUNCTION,
+        SymbolKind.CLASS,
+        SymbolKind.METHOD,
+        SymbolKind.INTERFACE,
+        SymbolKind.STRUCT,
+        SymbolKind.TYPE,
+    }
+    # Fixtures and vendored corpora are in the tree but are not what anyone
+    # asks a codebase about.
+    skip = ("fixtures/", "vendor/", "third_party/", "/testdata/", "node_modules/")
+
+    bundle = compress_paths([project])
+    candidates = [
+        f
+        for f in bundle.files
+        if not any(part in f.rel_path for part in skip)
+        and not Path(f.rel_path).name.startswith("test_")
+    ]
+    ranked = sorted(candidates, key=lambda f: -f.rank)[: count * 4]
+    if not ranked:
+        raise SystemExit(f"no source files under {project}: nothing to ask about")
+
+    rng = random.Random(seed)
+    tasks: list[str] = []
+    seen: set[str] = set()
+    for file in ranked:
+        named = [
+            sym
+            for sym in file.symbols
+            if sym.kind in definitions
+            and len(sym.name) > 3
+            and not sym.name.startswith("_")
+            and sym.name not in seen
+        ]
+        if not named:
+            continue
+        symbol = rng.choice(named)
+        seen.add(symbol.name)
+        tasks.append(
+            f"Which file defines `{symbol.name}`, and what is it for? "
+            "Answer with the path and one sentence only."
+        )
+        if len(tasks) >= count:
+            break
+
+    while len(tasks) < count and ranked:
+        file = ranked[len(tasks) % len(ranked)]
+        tasks.append(
+            f"What is `{file.rel_path}` responsible for, and which other module "
+            "uses it most? Answer in one sentence."
+        )
+    return tasks[:count]
+
+
 DEFAULT_TASKS = [
     "Which file and function decides whether a file gets a full skeleton or "
     "just an index line? Answer with the path and the function name only.",
@@ -261,6 +334,90 @@ def session(tasks: list[str], cwd: Path, turns: int, arm: str, repeat: int) -> l
     return runs
 
 
+def write_result_file(path: Path, arms: list[Arm], args: Any, tasks: list[str]) -> None:
+    """A run, in a form someone else's run can be compared against.
+
+    The point of bench/RESULTS.md is accumulating runs from repositories we do
+    not have, including ones that contradict us. That only works if a run is a
+    file rather than a screenshot of a terminal.
+    """
+    control = arms[0]
+    base = control.mean("cost_usd")
+    # Mirror report_arms exactly: the run-to-run spread is the widest arm, not
+    # the control's alone. If the JSON and the terminal disagreed about what
+    # counts as noise, RESULTS.md would accumulate claims the harness refused
+    # to print.
+    control_spread = control.stdev("cost_usd")
+    spread = max((a.stdev("cost_usd") for a in arms if a.ok), default=0.0)
+
+    payload = {
+        "schema": 1,
+        "generated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "cslim_version": _cslim_version(),
+        "project": {
+            "path": str(args.project),
+            "name": Path(args.project).name,
+            "commit": _git_head(Path(args.project)),
+        },
+        "design": {
+            "turns": args.turns,
+            "repeats": args.repeats,
+            "task_set": args.task_set,
+            "tasks": tasks,
+            "hook_max_tokens": args.hook_max_tokens,
+        },
+        "control_spread_usd": round(control_spread, 6),
+        "run_to_run_spread_usd": round(spread, 6),
+        "arms": [
+            {
+                "name": arm.name,
+                "sessions": len(arm.sessions),
+                "cost_usd_mean": round(arm.mean("cost_usd"), 6),
+                "cost_usd_per_session": [
+                    round(sum(r.cost_usd for r in s), 6) for s in arm.sessions
+                ],
+                "cache_creation_mean": round(arm.mean("cache_creation"), 1),
+                "total_tokens_mean": round(arm.mean("input_tokens"), 1),
+                "vs_control_pct": (
+                    None
+                    if not base
+                    else round((arm.mean("cost_usd") - base) / base * 100, 2)
+                ),
+                # The only field that matters when quoting: an effect smaller
+                # than the spread is not an effect.
+                "exceeds_spread": abs(arm.mean("cost_usd") - base) > spread,
+            }
+            for arm in arms
+        ],
+    }
+    payload["verdict"] = (
+        "measurable"
+        if any(a["exceeds_spread"] for a in payload["arms"][1:])  # type: ignore[index]
+        else "no measurable difference"
+    )
+    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
+def _cslim_version() -> str:
+    try:
+        from importlib.metadata import version
+
+        return version("cslim")
+    except Exception:
+        return "unknown"
+
+
+def _git_head(project: Path) -> str:
+    try:
+        proc = subprocess.run(
+            ["git", "-C", str(project), "rev-parse", "--short", "HEAD"],
+            capture_output=True, text=True, check=False,
+        )
+        return proc.stdout.strip() or "unknown"
+    except OSError:
+        return "unknown"
+
+
 def report_arms(arms: list[Arm], turns: int) -> None:
     """Compare every arm against the first one, which is the control."""
     control = arms[0]
@@ -326,8 +483,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project", type=Path, default=REPO)
     parser.add_argument(
-        "--task-set", choices=("cslim", "flask"), default="cslim",
-        help="Which question set to ask (must match the repo under test).",
+        "--task-set", choices=("auto", "cslim", "flask"), default="auto",
+        help="auto derives questions from the repo under test, so this runs "
+             "anywhere. cslim/flask are the fixed sets used for the published runs.",
     )
     parser.add_argument("--tasks", type=int, default=2, help="How many tasks to use.")
     parser.add_argument("--repeats", type=int, default=2, help="Repetitions per arm.")
@@ -345,6 +503,10 @@ def main() -> int:
         help="Comma-separated arm names to run (default: all). --list-arms shows them.",
     )
     parser.add_argument("--list-arms", action="store_true", help="Print arm names and exit.")
+    parser.add_argument(
+        "--json", dest="json_out", type=Path, default=None,
+        help="Write a machine-readable result file (for bench/RESULTS.md).",
+    )
     parser.add_argument("--yes", action="store_true", help="Skip the cost confirmation.")
     args = parser.parse_args()
 
@@ -352,7 +514,14 @@ def main() -> int:
         print("`claude` not found in PATH", file=sys.stderr)
         return 1
 
-    pool = FLASK_TASKS if args.task_set == "flask" else DEFAULT_TASKS
+    if args.task_set == "auto":
+        pool = generate_tasks(args.project, max(args.tasks, 1))
+        print(f"Generated {len(pool)} task(s) from {args.project.name}:")
+        for task in pool:
+            print(f"  - {task[:96]}")
+        print()
+    else:
+        pool = FLASK_TASKS if args.task_set == "flask" else DEFAULT_TASKS
     tasks = pool[: max(1, args.tasks)]
     sessions_per_arm = args.repeats if args.turns > 1 else args.repeats * len(tasks)
     if args.list_arms:
@@ -411,6 +580,10 @@ def main() -> int:
         print("\n(settings.json restored to its original state)")
 
     report_arms(list(arms.values()), args.turns)
+
+    if args.json_out:
+        write_result_file(args.json_out, list(arms.values()), args, pool)
+        print(f"\nWrote {args.json_out}")
     return 0
 
 
