@@ -318,3 +318,33 @@ def test_preamble_matches_the_tier(tmp_path: Path) -> None:
     assert "No signatures" in index_ctx
     assert "signatures, types" in skeleton_ctx
     assert "Function bodies are elided" not in index_ctx
+
+
+# --------------------------------------------------------------------------- #
+# platform-independent hook matching
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.parametrize(
+    ("command", "ours"),
+    [
+        ("/usr/local/bin/cslim hook --max-tokens 25000", True),
+        (r"C:\Users\a\AppData\Roaming\Python\Scripts\cslim.exe hook --quiet", True),
+        (r'"C:\Program Files\cslim.exe" hook', True),
+        ("/usr/bin/python -m cslim.main hook --path src", True),
+        ("echo hi", False),
+        ("/usr/bin/cslimmer hookah", False),
+    ],
+)
+def test_recognises_our_hook_whatever_the_executable_is_called(
+    command: str, ours: bool
+) -> None:
+    """Regression: matching the literal "cslim hook" broke on Windows.
+
+    There the executable is `cslim.exe`, so the command reads "cslim.exe hook",
+    the marker never matched, install was not idempotent and uninstall found
+    nothing to remove. CI on windows-latest is what surfaced it.
+    """
+    from cslim.core.installer import _is_ours
+
+    assert _is_ours({"command": command}) is ours

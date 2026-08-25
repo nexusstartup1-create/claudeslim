@@ -9,6 +9,7 @@ exactly what it changed.
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import sys
 from dataclasses import dataclass
@@ -28,7 +29,14 @@ __all__ = [
 EVENT = "UserPromptSubmit"
 
 #: How we recognise our own entry when updating or removing it.
+#:
+#: Matching the literal string "cslim hook" looked fine until CI ran on Windows,
+#: where the executable is `cslim.exe` and the command reads "cslim.exe hook" —
+#: the marker never matched, so install was not idempotent and uninstall found
+#: nothing to remove. The command is also `python -m cslim.main hook` when cslim
+#: is not on PATH. So we match the two invariant parts instead of a literal.
 MARKER = "cslim hook"
+_OURS = re.compile(r"cslim(?:\.exe|\.main)?[\"']?\s+hook(?:\s|$)", re.IGNORECASE)
 
 
 class InstallScope:
@@ -131,7 +139,10 @@ def _groups(data: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _is_ours(entry: Any) -> bool:
-    return isinstance(entry, dict) and MARKER in str(entry.get("command", ""))
+    """Is this hook entry one of ours, whatever the executable is called?"""
+    if not isinstance(entry, dict):
+        return False
+    return bool(_OURS.search(str(entry.get("command", ""))))
 
 
 def install_hook(
