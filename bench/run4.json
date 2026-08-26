@@ -48,9 +48,9 @@
         0.132124
       ],
       "cache_creation_mean": 3988.9,
-      "total_tokens_mean": 12.0,
       "vs_control_pct": 0.0,
-      "exceeds_spread": false
+      "exceeds_spread": false,
+      "uncached_input_tokens_mean": 12.0
     },
     {
       "name": "CLAUDE.md \u00b7 index",
@@ -67,9 +67,9 @@
         0.320329
       ],
       "cache_creation_mean": 8254.4,
-      "total_tokens_mean": 11.0,
       "vs_control_pct": 31.44,
-      "exceeds_spread": false
+      "exceeds_spread": false,
+      "uncached_input_tokens_mean": 11.0
     },
     {
       "name": "CLAUDE.md \u00b7 outline",
@@ -86,9 +86,9 @@
         0.092794
       ],
       "cache_creation_mean": 5988.6,
-      "total_tokens_mean": 8.5,
       "vs_control_pct": 7.26,
-      "exceeds_spread": false
+      "exceeds_spread": false,
+      "uncached_input_tokens_mean": 8.5
     }
   ],
   "verdict": "no measurable difference"

@@ -382,7 +382,7 @@ def write_result_file(path: Path, arms: list[Arm], args: Any, tasks: list[str]) 
     spread = max((a.stdev("cost_usd") for a in arms if a.ok), default=0.0)
 
     payload = {
-        "schema": 1,
+        "schema": 2,
         "generated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "cslim_version": _cslim_version(),
         "project": {
@@ -408,7 +408,11 @@ def write_result_file(path: Path, arms: list[Arm], args: Any, tasks: list[str]) 
                     round(sum(r.cost_usd for r in s), 6) for s in arm.sessions
                 ],
                 "cache_creation_mean": round(arm.mean("cache_creation"), 1),
-                "total_tokens_mean": round(arm.mean("input_tokens"), 1),
+                # input + cache write + cache read + output. Schema 1 wrote
+                # bare input_tokens under this name, which is the uncached
+                # sliver (~12/turn) and not a total at all; files at schema 1
+                # carry it as "uncached_input_tokens_mean" instead.
+                "total_tokens_mean": round(arm.mean("total_tokens"), 1),
                 "vs_control_pct": (
                     None
                     if not base

@@ -46,9 +46,9 @@
         0.144696
       ],
       "cache_creation_mean": 9356.5,
-      "total_tokens_mean": 11.7,
       "vs_control_pct": 0.0,
-      "exceeds_spread": false
+      "exceeds_spread": false,
+      "uncached_input_tokens_mean": 11.7
     },
     {
       "name": "hook \u00b7 full AST",
@@ -63,9 +63,9 @@
         0.290926
       ],
       "cache_creation_mean": 18874.5,
-      "total_tokens_mean": 10.7,
       "vs_control_pct": 44.42,
-      "exceeds_spread": false
+      "exceeds_spread": false,
+      "uncached_input_tokens_mean": 10.7
     },
     {
       "name": "CLAUDE.md \u00b7 full AST",
@@ -80,9 +80,9 @@
         0.213049
       ],
       "cache_creation_mean": 19830.5,
-      "total_tokens_mean": 8.3,
       "vs_control_pct": 77.62,
-      "exceeds_spread": false
+      "exceeds_spread": false,
+      "uncached_input_tokens_mean": 8.3
     },
     {
       "name": "CLAUDE.md \u00b7 index",
@@ -97,9 +97,9 @@
         0.131907
       ],
       "cache_creation_mean": 9335.0,
-      "total_tokens_mean": 9.7,
       "vs_control_pct": -1.53,
-      "exceeds_spread": false
+      "exceeds_spread": false,
+      "uncached_input_tokens_mean": 9.7
     }
   ],
   "verdict": "no measurable difference"

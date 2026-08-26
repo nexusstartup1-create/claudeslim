@@ -48,9 +48,9 @@
         0.159372
       ],
       "cache_creation_mean": 6908.2,
-      "total_tokens_mean": 11.5,
       "vs_control_pct": 0.0,
-      "exceeds_spread": false
+      "exceeds_spread": false,
+      "uncached_input_tokens_mean": 11.5
     },
     {
       "name": "CLAUDE.md \u00b7 index",
@@ -67,9 +67,9 @@
         0.176863
       ],
       "cache_creation_mean": 7818.6,
-      "total_tokens_mean": 10.0,
       "vs_control_pct": 9.67,
-      "exceeds_spread": false
+      "exceeds_spread": false,
+      "uncached_input_tokens_mean": 10.0
     },
     {
       "name": "CLAUDE.md \u00b7 full AST",
@@ -86,9 +86,9 @@
         0.175346
       ],
       "cache_creation_mean": 2968.4,
-      "total_tokens_mean": 8.2,
       "vs_control_pct": 12.99,
-      "exceeds_spread": false
+      "exceeds_spread": false,
+      "uncached_input_tokens_mean": 8.2
     },
     {
       "name": "CLAUDE.md \u00b7 repomix",
@@ -105,9 +105,9 @@
         0.374817
       ],
       "cache_creation_mean": 20972.9,
-      "total_tokens_mean": 7.5,
       "vs_control_pct": 221.28,
-      "exceeds_spread": false
+      "exceeds_spread": false,
+      "uncached_input_tokens_mean": 7.5
     }
   ],
   "verdict": "no measurable difference"
